@@ -4,16 +4,21 @@ from util.image_pool import ImagePool
 from util.util import tensor2im, empty_dictionary, tensor2im2, save_list_to_csv, load_saved_weights
 from .base_model import BaseModel, OrderedDict
 from . import networks
+from loss_functions import *
 import numpy as np
 from math import log10
 from skimage.metrics import structural_similarity
 from sewar.full_ref import vifp
 import cv2
 from skimage.feature import graycomatrix, graycoprops
+from torchmetrics.image.fid import FrechetInceptionDistance
 import torchvision.models as models
 from surgeon_pytorch import Inspect
 import os
+import pyiqa
 from .vgg import VGG
+import torch.nn.functional as F
+
 
 class CycleGANModel(BaseModel):
     """
@@ -65,6 +70,8 @@ class CycleGANModel(BaseModel):
             parser.add_argument('--vgg_model_path', type=str, default=None, help='finetuned vgg model path.')
             parser.add_argument('--lambda_perceptual', type=float, default=0.1, help='use perceptual loss.')
             parser.add_argument('--perceptual_layers', type=str, default='all', help='choose the perceptual layers.')
+            parser.add_argument('--attention_loss', type=bool, default=False,
+                                help='choose to use attention mechanism for loss computation.')
         return parser
 
     def __init__(self, opt):
@@ -78,7 +85,7 @@ class CycleGANModel(BaseModel):
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
         if opt.experiment_name.find('texture') != -1:
             self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'cycle_texture_A', 'D_B', 'G_B', 'cycle_B', 'idt_B',
-                                    'cycle_texture_B']
+                               'cycle_texture_B']
         elif opt.experiment_name.find('perceptual') != -1:
             self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'perceptual_A', 'D_B', 'G_B', 'cycle_B', 'idt_B',
                                'perceptual_B']
@@ -100,7 +107,7 @@ class CycleGANModel(BaseModel):
         self.visual_names = visual_names_A + visual_names_B  # combine visualizations for A and B
         #####
         self.test_visual_names = ['real_A', 'fake_B', 'real_B']
-        self.metric_names = ['psnr', 'ssim', 'vif']
+        self.metric_names = ['psnr', 'mse', 'ssim', 'vif', 'NIQE', 'FID']
         self.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web')
         self.loss_dir = os.path.join(self.web_dir, f'{opt.loss_folder}')
 
@@ -113,6 +120,12 @@ class CycleGANModel(BaseModel):
             self.avg_metrics[key] = OrderedDict()
             self.avg_metrics[key]['mean'] = list()
             self.avg_metrics[key]['std'] = list()
+
+        self.fid = FrechetInceptionDistance(feature=64, normalize=True)
+        self.real_test_buffer = torch.empty((560, 3, 256, 256))
+        self.fake_test_buffer = torch.empty((560, 3, 256, 256))
+
+        self.niqe = pyiqa.create_metric('niqe', device=torch.device('cpu'), as_loss=False)
 
         #####
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>.
@@ -140,7 +153,7 @@ class CycleGANModel(BaseModel):
                 assert (opt.input_nc == opt.output_nc)
             self.fake_A_pool = ImagePool(opt.pool_size)  # create image buffer to store previously generated images
             self.fake_B_pool = ImagePool(opt.pool_size)  # create image buffer to store previously generated images
-            # define loss functions
+            # define loss_functions
             self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)  # define GAN loss.
             self.criterionCycle = torch.nn.L1Loss()
             self.criterionIdt = torch.nn.L1Loss()
@@ -152,11 +165,17 @@ class CycleGANModel(BaseModel):
                                                 lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
+
+            if opt.attention_loss == True:
+                self.loss_grid_A = torch.empty(24)
+                self.loss_grid_B = torch.empty(24)
+
             if opt.lambda_perceptual > 0.0:
                 if opt.vgg_pretrained == True:
-                    self.vgg = VGG().to(int(opt.gpu_ids[1]))
+                    self.vgg = VGG()
                 else:
-                    self.vgg = VGG(num_classes=4, pretrained=False, init_type='finetuned', saved_weights_path=opt.vgg_model_path).to(int(opt.gpu_ids[1]))
+                    self.vgg = VGG(num_classes=4, pretrained=False, init_type='finetuned',
+                                   saved_weights_path=opt.vgg_model_path)
             self.index_texture_A = list()
             self.index_texture_B = list()
 
@@ -180,9 +199,11 @@ class CycleGANModel(BaseModel):
         self.fake_A = self.netG_B(self.real_B)  # G_B(B)
         self.rec_B = self.netG_A(self.fake_A)  # G_A(G_B(B))
 
-    def test(self):
+    def test(self, idx):
         with torch.no_grad():
+            self.real_test_buffer[idx, :, :, :] = (self.real_A+1)*0.5
             self.fake_B = self.netG_A(self.real_A)
+            self.fake_test_buffer[idx, :, :, :] = (self.fake_B+1)*0.5
             self.compute_metrics()
             self.track_metrics()
 
@@ -190,20 +211,31 @@ class CycleGANModel(BaseModel):
 
         x = tensor2im2(self.real_B)
         y = tensor2im2(self.fake_B)
+        # MSE
+        self.mse = np.square(np.subtract(x, y)).mean()
 
         # PSNR
-        mse = np.square(np.subtract(x, y)).mean()
-        if mse == 0:  # MSE is zero means no noise is present in the signal. Therefore, PSNR have no importance.
+        if self.mse == 0:  # MSE is zero means no noise is present in the signal. Therefore, PSNR have no importance.
             self.psnr = 100
         max_pixel = 1
 
-        self.psnr = 10 * log10((max_pixel ** 2) / mse)
+        self.psnr = 10 * log10((max_pixel ** 2) /self.mse)
 
         # SSIM
         self.ssim = structural_similarity(x, y, data_range=2)
 
+        # NIQE
+        fake_B_3channel = self.fake_B.expand(-1, 3, -1, -1)
+        self.NIQE = self.niqe(fake_B_3channel).item()
+
         # VIF
         self.vif = vifp(x, y)
+
+    def compute_fid(self):
+
+        self.fid.update(self.real_test_buffer, real=True)
+        self.fid.update(self.fake_test_buffer, real=False)
+        self.metrics_eval['FID'].append(self.fid.compute().item())
 
     def backward_D_basic(self, netD, real, fake):
         """Calculate GAN loss for the discriminator
@@ -243,7 +275,7 @@ class CycleGANModel(BaseModel):
         lambda_A = self.opt.lambda_A
         lambda_B = self.opt.lambda_B
         # Identity loss
-        if lambda_idt > 0:
+        if lambda_idt > 0 or self.attention_loss == True:
             # G_A should be identity if real_B is fed: ||G_A(B) - B||
             self.idt_A = self.netG_A(self.real_B)
             self.loss_idt_A = self.criterionIdt(self.idt_A, self.real_B) * lambda_B * lambda_idt
@@ -256,33 +288,37 @@ class CycleGANModel(BaseModel):
 
         lambda_texture = self.opt.lambda_texture
         # Texture loss
-        if lambda_texture > 0:
+        if lambda_texture > 0 or self.opt.attention_loss == True:
             self.textures_real_A = self.texture_extractor(self.real_A)
             self.textures_rec_A = self.texture_extractor(self.rec_A)
             self.textures_real_B = self.texture_extractor(self.real_B)
             self.textures_rec_B = self.texture_extractor(self.rec_B)
-            criterion_texture_A = self.criterionTexture(self.textures_rec_A, self.textures_real_A)
-            criterion_texture_B = self.criterionTexture(self.textures_rec_B, self.textures_real_B)
+            self.criterion_texture_A = torch.mean(self.criterionTexture(self.textures_rec_A, self.textures_real_A),
+                                                  dim=0,
+                                                  keepdim=True)
+            self.criterion_texture_B = torch.mean(self.criterionTexture(self.textures_rec_B, self.textures_real_B),
+                                                  dim=0,
+                                                  keepdim=True)
 
             if self.opt.texture_criterion == 'max':
-                loss_cycle_texture_A = torch.max(criterion_texture_A)
-                loss_cycle_texture_B = torch.max(criterion_texture_B)
-                self.index_texture_A.append(torch.where(criterion_texture_A == loss_cycle_texture_A)[2:])
-                self.index_texture_B.append(torch.where(criterion_texture_B == loss_cycle_texture_B)[2:])
+                loss_cycle_texture_A = torch.max(self.criterion_texture_A)
+                loss_cycle_texture_B = torch.max(self.criterion_texture_B)
+                self.index_texture_A.append(torch.where(self.criterion_texture_A == loss_cycle_texture_A)[2:])
+                self.index_texture_B.append(torch.where(self.criterion_texture_B == loss_cycle_texture_B)[2:])
                 self.loss_cycle_texture_A = loss_cycle_texture_A * lambda_texture
                 self.loss_cycle_texture_B = loss_cycle_texture_B * lambda_texture
 
             elif self.opt.texture_criterion == 'normalized':
                 normalizing_factor_real_A = torch.max(self.textures_real_A)
                 normalizing_factor_real_B = torch.max(self.textures_real_B)
-                loss_cycle_texture_A = torch.sum(criterion_texture_A)/normalizing_factor_real_A
-                loss_cycle_texture_B = torch.sum(criterion_texture_B)/normalizing_factor_real_B
+                loss_cycle_texture_A = torch.sum(self.criterion_texture_A) / normalizing_factor_real_A
+                loss_cycle_texture_B = torch.sum(self.criterion_texture_B) / normalizing_factor_real_B
                 self.loss_cycle_texture_A = loss_cycle_texture_A * 1
                 self.loss_cycle_texture_B = loss_cycle_texture_B * 1
 
             elif self.opt.texture_criterion == 'average':
-                self.loss_cycle_texture_A = torch.mean(criterion_texture_A) * lambda_texture
-                self.loss_cycle_texture_B = torch.mean(criterion_texture_B) * lambda_texture
+                self.loss_cycle_texture_A = torch.mean(self.criterion_texture_A) * lambda_texture
+                self.loss_cycle_texture_B = torch.mean(self.criterion_texture_B) * lambda_texture
             else:
                 raise NotImplementedError
         else:
@@ -306,10 +342,44 @@ class CycleGANModel(BaseModel):
         self.loss_cycle_A = self.criterionCycle(self.rec_A, self.real_A) * lambda_A
         # Backward cycle loss || G_A(G_B(B)) - B||
         self.loss_cycle_B = self.criterionCycle(self.rec_B, self.real_B) * lambda_B
+
         # combined loss and calculate gradients
-        self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B + self.loss_cycle_texture_A + self.loss_cycle_texture_B + self.loss_perceptual_A + self.loss_perceptual_B
+        if self.opt.attention_loss == True:
+            self.create_grid_loss()
+            self.attention()
+            self.loss_G = self.loss_G_A + self.loss_G_B + torch.sum(self.loss_grid_A) + torch.sum(self.loss_grid_B)
+
+        else:
+            # combined loss and calculate gradients
+
+            self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B + self.loss_cycle_texture_A + self.loss_cycle_texture_B + self.loss_perceptual_A + self.loss_perceptual_B
 
         self.loss_G.backward()
+
+    def create_grid_loss(self):
+        self.loss_grid_A[0] = self.loss_cycle_A
+        self.loss_grid_B[0] = self.loss_cycle_B
+        self.loss_grid_A[1] = self.loss_idt_A
+        self.loss_grid_B[1] = self.loss_idt_B
+        self.loss_grid_A[2] = self.loss_perceptual_A
+        self.loss_grid_B[2] = self.loss_perceptual_B
+        self.loss_grid_A[3] = self.m1_A
+        self.loss_grid_B[3] = self.m1_B
+        self.loss_grid_A[4] = self.m2_A
+        self.loss_grid_B[4] = self.m2_B
+        self.loss_grid_A[5] = self.m3_A
+        self.loss_grid_B[5] = self.m3_B
+        self.loss_grid_A[6] = self.m4_A
+        self.loss_grid_B[6] = self.m4_B
+        self.loss_grid_A[7] = self.m5_A
+        self.loss_grid_B[7] = self.m5_B
+
+        i = 8
+        for idx_1 in range(0, 4):
+            for idx_2 in range(0, 4):
+                self.loss_grid_A[i] = self.criterion_texture_A[0, 0, idx_1, idx_2]
+                self.loss_grid_B[i] = self.criterion_texture_B[0, 0, idx_1, idx_2]
+                i += 1
 
     def optimize_parameters(self):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
@@ -360,27 +430,29 @@ class CycleGANModel(BaseModel):
         real_A = self.real_A.expand(-1, 3, -1, -1)
         real_B = self.real_B.expand(-1, 3, -1, -1)
 
-        f1_real_A, f2_real_A, f3_real_A, f4_real_A, f5_real_A = self.vgg_16_pretrained(real_A)  # extract features from vgg
+        f1_real_A, f2_real_A, f3_real_A, f4_real_A, f5_real_A = self.vgg_16_pretrained(
+            real_A)  # extract features from vgg
         f1_real_B, f2_real_B, f3_real_B, f4_real_B, f5_real_B = self.vgg_16_pretrained(real_B)
 
-        f1_rec_A, f2_rec_A, f3_rec_A, f4_rec_A, f5_rec_A = self.vgg_16_pretrained(rec_A)  # extract features from vgg (1st,2nd, 3rd, 4th, 5th pool)
+        f1_rec_A, f2_rec_A, f3_rec_A, f4_rec_A, f5_rec_A = self.vgg_16_pretrained(
+            rec_A)  # extract features from vgg (1st,2nd, 3rd, 4th, 5th pool)
         f1_rec_B, f2_rec_B, f3_rec_B, f4_rec_B, f5_rec_B = self.vgg_16_pretrained(rec_B)
 
         if self.opt.perceptual_layers == 'all':
-            m1_A = torch.mean(torch.mean((f1_real_A - f1_rec_A) ** 2))  # mse difference
-            m2_A = torch.mean(torch.mean((f2_real_A - f2_rec_A) ** 2))
-            m3_A = torch.mean(torch.mean((f3_real_A - f3_rec_A) ** 2))
-            m4_A = torch.mean(torch.mean((f4_real_A - f4_rec_A) ** 2))
-            m5_A = torch.mean(torch.mean((f5_real_A - f5_rec_A) ** 2))
+            self.m1_A = torch.mean(torch.mean((f1_real_A - f1_rec_A) ** 2))  # mse difference
+            self.m2_A = torch.mean(torch.mean((f2_real_A - f2_rec_A) ** 2))
+            self.m3_A = torch.mean(torch.mean((f3_real_A - f3_rec_A) ** 2))
+            self.m4_A = torch.mean(torch.mean((f4_real_A - f4_rec_A) ** 2))
+            self.m5_A = torch.mean(torch.mean((f5_real_A - f5_rec_A) ** 2))
 
-            m1_B = torch.mean(torch.mean((f1_real_B - f1_rec_B) ** 2))
-            m2_B = torch.mean(torch.mean((f2_real_B - f2_rec_B) ** 2))
-            m3_B = torch.mean(torch.mean((f3_real_B - f3_rec_B) ** 2))
-            m4_B = torch.mean(torch.mean((f4_real_B - f4_rec_B) ** 2))
-            m5_B = torch.mean(torch.mean((f5_real_B - f5_rec_B) ** 2))
+            self.m1_B = torch.mean(torch.mean((f1_real_B - f1_rec_B) ** 2))
+            self.m2_B = torch.mean(torch.mean((f2_real_B - f2_rec_B) ** 2))
+            self.m3_B = torch.mean(torch.mean((f3_real_B - f3_rec_B) ** 2))
+            self.m4_B = torch.mean(torch.mean((f4_real_B - f4_rec_B) ** 2))
+            self.m5_B = torch.mean(torch.mean((f5_real_B - f5_rec_B) ** 2))
 
-            perceptual_loss_A = m1_A + m2_A + m3_A + m4_A + m5_A
-            perceptual_loss_B = m1_B + m2_B + m3_B + m4_B + m5_B
+            perceptual_loss_A = self.m1_A + self.m2_A + self.m3_A + self.m4_A + self.m5_A
+            perceptual_loss_B = self.m1_B + self.m2_B + self.m3_B + self.m4_B + self.m5_B
         elif self.opt.perceptual_layers == '1-2':
             m1_A = torch.mean(torch.mean((f1_real_A - f1_rec_A) ** 2))  # mse difference
             m2_A = torch.mean(torch.mean((f2_real_A - f2_rec_A) ** 2))
@@ -413,7 +485,8 @@ class CycleGANModel(BaseModel):
 
     # EXTRACT THE POOLING LAYERS FROM THE PRETRAINED VGG-16
     def vgg_16_pretrained(self, image):
-        wrapped_model = Inspect(self.vgg, layer=['features.4', 'features.9', 'features.16', 'features.23', 'features.30'])
+        wrapped_model = Inspect(self.vgg,
+                                layer=['features.4', 'features.9', 'features.16', 'features.23', 'features.30'])
         _, [p1, p2, p3, p4, p5] = wrapped_model(image)
 
         return p1, p2, p3, p4, p5
@@ -421,3 +494,13 @@ class CycleGANModel(BaseModel):
     def save_texture_indexes(self):
         save_list_to_csv(self.index_texture_A, f'{self.loss_dir}/idx_texture_A.csv')
         save_list_to_csv(self.index_texture_B, f'{self.loss_dir}/idx_texture_B.csv')
+
+    def attention(self):
+
+        activated_A = F.relu(self.loss_grid_A)
+        alpha_A = torch.sigmoid(activated_A)
+        self.loss_weighted_A = alpha_A * self.loss_grid_A
+
+        activated_B = F.relu(self.loss_grid_B)
+        alpha_B = torch.sigmoid(activated_B)
+        self.loss_weighted_B = alpha_B * self.loss_grid_B
