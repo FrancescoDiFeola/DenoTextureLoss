@@ -267,10 +267,10 @@ class Visualizer():
                    tracked losses (OrderedDict) -- the whole losses history so far
                """
 
-        metric_path = os.path.join(self.metric_dir, f'metrics.png')
+        metric_path = os.path.join(self.metric_dir, f'metrics_{self.opt.test}.png')
         util.save_plots(tracked_metrics, metric_path, name_title)  # save the plots to the disk
-        csv_path1 = os.path.join(self.metric_dir, f'metrics_test.csv')
-        csv_path2 = os.path.join(self.metric_dir, f'metrics_epoch{epoch}.csv')
+        csv_path1 = os.path.join(self.metric_dir, f'metrics_{self.opt.test}.csv')
+        csv_path2 = os.path.join(self.metric_dir, f'metrics_{self.opt.test}_epoch{epoch}.csv')
         util.save_ordered_dict_as_csv(tracked_metrics, csv_path1)
         if epoch == 1 or epoch == 200:
             util.save_ordered_dict_as_csv(epoch_performance, csv_path2)

@@ -57,9 +57,11 @@ class BaseModel(ABC):
         self.vif = 0
         self.metrics_eval = OrderedDict()
         self.metric = 0  # used for learning rate policy 'plateau'
-        self.avg_metrics = OrderedDict()
+        self.avg_metrics_test_1 = OrderedDict()
+        self.avg_metrics_test_2 = OrderedDict()
+        self.avg_metrics_test_3 = OrderedDict()
 
-        if opt.isTrain == True:
+        '''if opt.isTrain == True:
             if self.avg_metrics:
                 for name in self.metric_names:
                     if isinstance(name, str):
@@ -69,7 +71,7 @@ class BaseModel(ABC):
                         self.avg_metrics[name]['std'].append(
                             float(np.std(
                                 self.metrics_eval[name])))  # float(...) works for both scalar tensor and float number
-            self.metrics_eval = OrderedDict()
+            self.metrics_eval = OrderedDict()'''
 
     @staticmethod
     def modify_commandline_options(parser, is_train):
@@ -134,8 +136,26 @@ class BaseModel(ABC):
         if bool(self.metrics_eval):
 
             for key in self.metrics_eval.keys():
-                self.avg_metrics[key]['mean'].append(np.mean(self.metrics_eval[key]))
-                self.avg_metrics[key]['std'].append(np.std(self.metrics_eval[key]))
+                if key == 'FID':
+                    if self.opt.test == 'test_1':
+                        self.avg_metrics_test_1[key]['mean'].append(self.metrics_eval['FID'])
+                        self.avg_metrics_test_1[key]['std'].append('-')
+                    elif self.opt.test == 'test_2':
+                        self.avg_metrics_test_2[key]['mean'].append(self.metrics_eval['FID'])
+                        self.avg_metrics_test_2[key]['std'].append('-')
+                    elif self.opt.test == 'test_3':
+                        self.avg_metrics_test_3[key]['mean'].append(self.metrics_eval['FID'])
+                        self.avg_metrics_test_3[key]['std'].append('-')
+                else:
+                    if self.opt.test == 'test_1':
+                        self.avg_metrics_test_1[key]['mean'].append(np.mean(self.metrics_eval[key]))
+                        self.avg_metrics_test_1[key]['std'].append(np.std(self.metrics_eval[key]))
+                    elif self.opt.test == 'test_2':
+                        self.avg_metrics_test_2[key]['mean'].append(np.mean(self.metrics_eval[key]))
+                        self.avg_metrics_test_2[key]['std'].append(np.std(self.metrics_eval[key]))
+                    elif self.opt.test == 'test_3':
+                        self.avg_metrics_test_3[key]['mean'].append(np.mean(self.metrics_eval[key]))
+                        self.avg_metrics_test_3[key]['std'].append(np.std(self.metrics_eval[key]))
 
     def train(self):
         """Make models train mode after test time"""
@@ -144,10 +164,16 @@ class BaseModel(ABC):
                 net = getattr(self, 'net' + name)
                 net.train()
 
+    def empty_dictionary(self):
         empty_dictionary(self.metrics_eval)
 
     def get_avg_test_metrics(self):
-        return self.avg_metrics
+        if self.opt.test == 'test_1':
+            return self.avg_metrics_test_1
+        elif self.opt.test == 'test_2':
+            return self.avg_metrics_test_2
+        elif self.opt.test == 'test_3':
+            return self.avg_metrics_test_3
 
     def get_epoch_performance(self):
         return self.metrics_eval
@@ -225,7 +251,7 @@ class BaseModel(ABC):
 
     def track_metrics(self):
         for name in self.metric_names:
-            if isinstance(name, str):
+            if isinstance(name, str) and name != 'FID':
                 self.metrics_eval[name].append(
                     float(getattr(self, name)))  # float(...) works for both scalar tensor and float number
         return self.metrics_eval

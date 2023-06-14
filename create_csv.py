@@ -44,34 +44,21 @@ def create_annotation_file(path_folder, domain):
 
 
 if __name__ == "__main__":
-    import torch
-    import random
-    loss = torch.nn.L1Loss(reduction='none')
-    random.seed(42)
-    input = torch.randn(2, 1, 2, 2, requires_grad=True)
 
-    target = torch.randn(2, 1 ,2, 2)
 
-    output = loss(target, input)
-    print(torch.max(output))
-    print(torch.max((abs(input-target))))
-    for i in range(0, target.shape[0]):
-        print(i)
 
-    '''
     
     interim_dir = './data/'
     df_ld = create_annotation_file(
-        path_folder='./CT_data/interim/test_mayo/full_1mm',
+        path_folder='./CT_data/interim/test_mayo_ext/HDCT',
         domain='HD',
     )
     df_hd = create_annotation_file(
-        path_folder='./CT_data/interim/test_mayo/quarter_1mm',
+        path_folder='./CT_data/interim/test_mayo_ext/LDCT',
         domain='LD',
     )
 
     df = pd.concat([df_ld, df_hd], axis=0, ignore_index=True)
-    df.to_csv(os.path.join(interim_dir, 'mayo_test_1p.csv'))
+    df.to_csv(os.path.join(interim_dir, 'mayo_test_ext.csv'))
 
     print('May be the force with you.')
-    '''

@@ -41,6 +41,10 @@ if __name__ == '__main__':
     dataset_test = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options (test dataset)
     print(len(dataset_test))
 
+    opt.text_file = "./data/mayo_test_ext.csv"  # load the csv file containing test data info
+    dataset_test_2 = create_dataset(opt)
+    print(len(dataset_test_2))
+
     for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):  # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
 
         epoch_start_time = time.time()  # timer for entire epoch
@@ -74,17 +78,31 @@ if __name__ == '__main__':
         opt.isTrain = False
         model.eval()
         # are needed.
-
+        opt.test = 'test_1'
         for j, data_test in enumerate(dataset_test):
             model.set_input(data_test)  # unpack data from data loader
-            model.test()  # run inference
+            model.test(j)  # run inference
 
             if j % 80 == 0:
                 visualizer.display_current_results(model.compute_test_visuals(), epoch, True)
 
-        opt.isTrain = True
         model.avg_performance()
-        visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch, 'Average Metrics on test')
+        visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch, f'Average Metrics on {opt.test}')
+        model.empty_dictionary()
+
+        opt.test = 'test_2'
+        for j, data_test in enumerate(dataset_test_2):
+            model.set_input(data_test)  # unpack data from data loader
+            model.test(j)  # run inference
+
+            if j % 80 == 0:
+                visualizer.display_current_results(model.compute_test_visuals(), epoch, True)
+
+        model.avg_performance()
+        visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch, f'Average Metrics on {opt.test}')
+        model.empty_dictionary()
+
+        opt.isTrain = True
         model.train()
         ##########
 
