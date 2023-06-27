@@ -10,8 +10,7 @@ import cv2
 import torch
 import matplotlib.pyplot as plt
 
-
-class MayoDataset(BaseDataset):
+class LidcIdriDataset(BaseDataset):
     """
     This dataset class can load unaligned/unpaired datasets.
 
@@ -88,18 +87,11 @@ class MayoDataset(BaseDataset):
         """
         BaseDataset.__init__(self, opt)
         annotations = self.opt.text_file
-        annotations_df = pd.read_csv(annotations)
-        self.annotations_A = annotations_df.loc[annotations_df['domain'] == 'LD'].reset_index(drop=True)
-        # self.annotations_A = annotations_A.sort_values(by=['partial_path'])
-        self.annotations_B = annotations_df.loc[annotations_df['domain'] == 'HD'].reset_index(drop=True)
-        # self.annotations_B = annotations_B.sort_values(by=['partial_path'])
+        self.annotations = pd.read_csv(annotations)
         self.window_width = opt.window_width
         self.window_center = opt.window_center
-        self.A_size = len(self.annotations_A)  # get the size of dataset A
-        self.B_size = len(self.annotations_B)  # get the size of dataset B
-        self.dataset_len = max(self.A_size, self.B_size)
+        self.dataset_len = len(self.annotations)
         self.plot_verbose = opt.plot_verbose
-        # btoA = self.opt.direction == 'BtoA'
 
     def __getitem__(self, index):
         """Return a data point and its metadata information.
@@ -113,25 +105,17 @@ class MayoDataset(BaseDataset):
             A_paths (str)    -- image paths
             B_paths (str)    -- image paths
         """
-        index_A = index % self.A_size
-        A_path = self.annotations_A['path_slice'].iloc[index_A]  # make sure index is within the range
-        if self.opt.model == 'pix2pix' or self.opt.serial_batches:  # make sure index is within then range
-            index_B = index_A
-        else:  # randomize the index for domain B to avoidse fixed pairs.
-            index_B = random.randint(0, self.B_size - 1)
-        B_path = self.annotations_B['path_slice'].iloc[index_B]
-        A_img = pydicom.dcmread(A_path)
-        B_img = pydicom.dcmread(B_path)
+        index = index % self.dataset_len
+        im_path = self.annotations['path_slice'].iloc[index]  # make sure index is within the range
+        im = pydicom.dcmread(im_path)
         # apply image transformation
-        A = self.transforms(A_img)
-        B = self.transforms(B_img)
+        img = self.transforms(im)
 
         if self.plot_verbose:
-            self.plot_img(A, pname='LD')
-            self.plot_img(B, pname='HD')
-            print(A_path)
-            print(B_path)
-        return {'A': A, 'B': B, 'A_paths': A_path, 'B_paths': B_path}
+            self.plot_img(img, pname='LIDC image')
+            print(im_path)
+
+        return {'img': img,  'im_paths': im_path}
 
     def __len__(self):
         """Return the total number of images in the dataset.
@@ -139,7 +123,7 @@ class MayoDataset(BaseDataset):
         As we have two datasets with potentially different number of images,
         we take a maximum of
         """
-        return max(self.A_size, self.B_size)
+        return self.dataset_len
 
     def window_image(self, hu_img):  # image windowing
         img_w = hu_img.copy()

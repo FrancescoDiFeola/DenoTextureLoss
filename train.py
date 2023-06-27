@@ -24,10 +24,12 @@ from data import create_dataset
 from models import create_model
 from util.visualizer_offline import Visualizer
 from util.util import save_ordered_dict_as_csv
+from tqdm import tqdm
+
 if __name__ == '__main__':
     opt = TrainOptions().parse()  # get training options
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options (train dataset)
-    dataset_size = len(dataset)  # get the number of images in the dataset.
+    dataset_size = len(dataset)  # get the number of images in the training dataset.
     print('The number of training images = %d' % dataset_size)
 
     model = create_model(opt)  # create a model given opt.model and other options
@@ -35,15 +37,40 @@ if __name__ == '__main__':
     visualizer = Visualizer(opt)  # create a visualizer that display/save images and plots
     total_iters = 0  # the total number of training iterations
 
+    # Test 1 (1 patient from Mayo dataset)
     opt.text_file = "./data/mayo_test_1p.csv"  # load the csv file containing test data info
     opt.serial_batches = True
     opt.batch_size = 1
     dataset_test = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options (test dataset)
     print(len(dataset_test))
 
+    # Test 2 (8 patient from Mayo dataset extended)
     opt.text_file = "./data/mayo_test_ext.csv"  # load the csv file containing test data info
     dataset_test_2 = create_dataset(opt)
     print(len(dataset_test_2))
+
+    # Test 3 (8 patient from LIDC/IDRI)
+    opt.text_file = "./data/LIDC_test.csv"  # load the csv file containing test data info
+    opt.dataset_mode = "LIDC_IDRI"
+    dataset_test_3 = create_dataset(opt)
+    print(len(dataset_test_3))
+
+    # TEST
+    opt.isTrain = False
+    model.eval()
+    # are needed.
+    opt.test = 'test_1'
+    for j, data_test in tqdm(enumerate(dataset_test)):
+        model.set_input(data_test)  # unpack data from data loader
+        print(j)
+        model.test(j)  # run inference
+
+        # if j % 80 == 0:
+        #     visualizer.display_current_results(model.compute_test_visuals(), epoch, True)
+
+    model.avg_performance()
+    visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), 1, f'Average Metrics on {opt.test}')
+    model.empty_dictionary()
 
     for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):  # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
 
@@ -62,9 +89,9 @@ if __name__ == '__main__':
             model.optimize_parameters()  # calculate loss functions, get gradients, update network weights
 
             if total_iters % opt.print_freq == 0:  # print training losses and save logging information to the disk
-                current_losses = model.get_current_losses()
-                t_comp = (time.time() - iter_start_time) / opt.batch_size
-                visualizer.print_current_losses(epoch, epoch_iter, current_losses, t_comp, t_data)
+                current_losses = model.get_current_losses() # get the current loss values
+                t_comp = (time.time() - iter_start_time) / opt.batch_size  # get the avg time for each image in the batch
+                visualizer.print_current_losses(epoch, epoch_iter, current_losses, t_comp, t_data)  # print the current loss values
                 tracked_losses = model.track_current_losses()
                 visualizer.plot_current_losses(epoch, float(epoch_iter) / dataset_size, current_losses, tracked_losses, 'Loss_functions')
             if total_iters % opt.save_latest_freq == 0:  # cache our latest model every <save_latest_freq> iterations
@@ -87,7 +114,7 @@ if __name__ == '__main__':
                 visualizer.display_current_results(model.compute_test_visuals(), epoch, True)
 
         model.avg_performance()
-        visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch, f'Average Metrics on {opt.test}')
+        # visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch, f'Average Metrics on {opt.test}')
         model.empty_dictionary()
 
         opt.test = 'test_2'
@@ -99,9 +126,20 @@ if __name__ == '__main__':
                 visualizer.display_current_results(model.compute_test_visuals(), epoch, True)
 
         model.avg_performance()
-        visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch, f'Average Metrics on {opt.test}')
+        # visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch, f'Average Metrics on {opt.test}')
         model.empty_dictionary()
 
+        opt.test = 'test_3'
+        for j, data_test in enumerate(dataset_test_2):
+            model.set_input(data_test)  # unpack data from data loader
+            model.test(j)  # run inference
+
+            if j % 80 == 0:
+                visualizer.display_current_results(model.compute_test_visuals(), epoch, True)
+
+        model.avg_performance()
+        # visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch, f'Average Metrics on {opt.test}')
+        model.empty_dictionary()
         opt.isTrain = True
         model.train()
         ##########

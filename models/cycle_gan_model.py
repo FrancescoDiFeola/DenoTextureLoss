@@ -19,7 +19,7 @@ import pyiqa
 from .vgg import VGG
 import torch.nn.functional as F
 from loss_functions.attention import Self_Attn
-
+from .FID import *
 
 class CycleGANModel(BaseModel):
     """
@@ -109,6 +109,7 @@ class CycleGANModel(BaseModel):
         self.visual_names = visual_names_A + visual_names_B  # combine visualizations for A and B
         #####
         self.test_visual_names = ['real_A', 'fake_B', 'real_B']
+
         self.metric_names = ['psnr', 'mse', 'ssim', 'vif', 'NIQE', 'FID']
         self.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web')
         self.loss_dir = os.path.join(self.web_dir, f'{opt.loss_folder}')
@@ -133,7 +134,10 @@ class CycleGANModel(BaseModel):
             self.avg_metrics_test_3[key]['mean'] = list()
             self.avg_metrics_test_3[key]['std'] = list()
 
-        self.fid = FrechetInceptionDistance(feature=64, normalize=True)
+        # self.fid = FrechetInceptionDistance(feature=64, normalize=True)
+        block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[64]
+        self.inception_model = InceptionV3([block_idx])
+
         self.real_test_1_buffer = torch.empty((560, 3, 256, 256))
         self.fake_test_1_buffer = torch.empty((560, 3, 256, 256))
 
@@ -228,41 +232,56 @@ class CycleGANModel(BaseModel):
             elif self.opt.test == 'test_2':
                 self.fake_test_2_buffer[idx, :, :, :] = (self.fake_B + 1) * 0.5
 
-            self.compute_metrics()
+            self.compute_metrics(idx)
             self.track_metrics()
 
-    def compute_metrics(self):
+    def compute_metrics(self, idx):
+        if self.opt.test == 'test_3':
+            # NIQE
+            fake_B_3channel = self.fake_B.expand(-1, 3, -1, -1)
+            self.NIQE = self.niqe(fake_B_3channel).item()
+            self.mse = 0
+            self.psnr = 0
+            self.ssim = 0
+            self.vif = 0
+        else:
+            x = tensor2im2(self.real_B)
+            y = tensor2im2(self.fake_B)
+            # MSE
+            self.mse = np.square(np.subtract(x, y)).mean()
 
-        x = tensor2im2(self.real_B)
-        y = tensor2im2(self.fake_B)
-        # MSE
-        self.mse = np.square(np.subtract(x, y)).mean()
+            # PSNR
+            if self.mse == 0:  # MSE is zero means no noise is present in the signal. Therefore, PSNR have no importance.
+                self.psnr = 100
+            max_pixel = 1
 
-        # PSNR
-        if self.mse == 0:  # MSE is zero means no noise is present in the signal. Therefore, PSNR have no importance.
-            self.psnr = 100
-        max_pixel = 1
+            self.psnr = 10 * log10((max_pixel ** 2) / self.mse)
 
-        self.psnr = 10 * log10((max_pixel ** 2) / self.mse)
+            # SSIM
+            self.ssim = structural_similarity(x, y, data_range=2)
 
-        # SSIM
-        self.ssim = structural_similarity(x, y, data_range=2)
+            # NIQE
+            fake_B_3channel = self.fake_B.expand(-1, 3, -1, -1)
+            self.NIQE = self.niqe(fake_B_3channel).item()
 
-        # NIQE
-        fake_B_3channel = self.fake_B.expand(-1, 3, -1, -1)
-        self.NIQE = self.niqe(fake_B_3channel).item()
+            # VIF
+            self.vif = vifp(x, y)
 
-        # VIF
-        self.vif = vifp(x, y)
+            # FID
+            self.compute_fid(idx)
 
-    def compute_fid(self):
-        if self.opt.test == 'test_1':
-            self.fid.update(self.real_test_1_buffer, real=True)
-            self.fid.update(self.fake_test_1_buffer, real=False)
-        elif self.opt.test == 'test_2':
+    def compute_fid(self, idx):
+        if self.opt.test == 'test_1' and idx == len(self.real_test_1_buffer)-1:
+            print(f"index:{idx}")
+            # self.fid.update(self.real_test_1_buffer, real=True)
+            # self.fid.update(self.fake_test_1_buffer, real=False)
+            self.metrics_eval['FID'].append(calculate_fretchet(self.real_test_1_buffer, self.fake_test_1_buffer, self.inception_model))
+        elif self.opt.test == 'test_2' and idx == len(self.real_test_2_buffer)-1:
             self.fid.update(self.real_test_2_buffer, real=True)
             self.fid.update(self.fake_test_2_buffer, real=False)
-        self.metrics_eval['FID'].append(self.fid.compute().item())
+            self.metrics_eval['FID'].append(self.fid.compute().item())
+        else:
+            pass
 
     def backward_D_basic(self, netD, real, fake):
         """Calculate GAN loss for the discriminator
@@ -323,29 +342,61 @@ class CycleGANModel(BaseModel):
 
             if self.opt.texture_criterion == 'attention':
                 print(self.criterionTexture(self.textures_rec_A, self.textures_real_A).permute(1, 0, 2, 3).shape)
-                out_attention_A, _ = self.attention(self.criterionTexture(self.textures_rec_A, self.textures_real_A).permute(1, 0, 2, 3))
-                out_attention_B, _ = self.attention(self.criterionTexture(self.textures_rec_B, self.textures_real_B).permute(1, 0, 2, 3))
+                out_attention_A, _ = self.attention(
+                    self.criterionTexture(self.textures_rec_A, self.textures_real_A).permute(1, 0, 2, 3))
+                out_attention_B, _ = self.attention(
+                    self.criterionTexture(self.textures_rec_B, self.textures_real_B).permute(1, 0, 2, 3))
                 self.loss_cycle_texture_A = torch.sum(torch.mean(out_attention_A.permute(1, 0, 2, 3),
-                                                      dim=0,
-                                                      keepdim=True))
+                                                                 dim=0,
+                                                                 keepdim=True))
 
                 self.loss_cycle_texture_B = torch.sum(torch.mean(out_attention_B.permute(1, 0, 2, 3),
-                                                      dim=0,
-                                                      keepdim=True))
+                                                                 dim=0,
+                                                                 keepdim=True))
             elif self.opt.texture_criterion == 'max':
 
-                self.criterion_texture_A = torch.mean(self.criterionTexture(self.textures_rec_A, self.textures_real_A),
-                                                      dim=0,
-                                                      keepdim=True)
-                self.criterion_texture_B = torch.mean(self.criterionTexture(self.textures_rec_B, self.textures_real_B),
-                                                      dim=0,
-                                                      keepdim=True)
-                loss_cycle_texture_A = torch.max(self.criterion_texture_A)
-                loss_cycle_texture_B = torch.max(self.criterion_texture_B)
-                self.index_texture_A.append(torch.where(self.criterion_texture_A == loss_cycle_texture_A)[2:])
-                self.index_texture_B.append(torch.where(self.criterion_texture_B == loss_cycle_texture_B)[2:])
-                self.loss_cycle_texture_A = loss_cycle_texture_A * lambda_texture
-                self.loss_cycle_texture_B = loss_cycle_texture_B * lambda_texture
+                delta_grids_A = self.criterionTexture(self.textures_rec_A, self.textures_real_A).view(16, -1)
+                self.criterion_texture_A, _ = torch.max(delta_grids_A, dim=1)
+
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[0]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[1]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[2]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[3]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[4]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[5]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[6]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[7]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[8]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[9]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[10]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[11]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[12]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[13]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[14]).squeeze())
+                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[15]).squeeze())
+
+                delta_grids_B = self.criterionTexture(self.textures_rec_B, self.textures_real_B).view(16, -1)
+                self.criterion_texture_B, _ = torch.max(delta_grids_B, dim=1)
+
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[0]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[1]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[2]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[3]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[4]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[5]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[6]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[7]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[8]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[9]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[10]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[11]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[12]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[13]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[14]).squeeze())
+                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[15]).squeeze())
+
+                self.loss_cycle_texture_A = torch.mean(self.criterion_texture_A) * lambda_texture
+                self.loss_cycle_texture_B = torch.mean(self.criterion_texture_B) * lambda_texture
 
             elif self.opt.texture_criterion == 'normalized':
 
@@ -393,10 +444,10 @@ class CycleGANModel(BaseModel):
         self.loss_G_B = self.criterionGAN(self.netD_B(self.fake_A), True)
         # Forward cycle loss || G_B(G_A(A)) - A||
         self.loss_cycle_A = self.criterionCycle(self.rec_A, self.real_A) * lambda_A
+        print(self.loss_cycle_A)
         # Backward cycle loss || G_A(G_B(B)) - B||
         self.loss_cycle_B = self.criterionCycle(self.rec_B, self.real_B) * lambda_B
-
-
+        print(self.loss_cycle_B)
         self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B + self.loss_cycle_texture_A + self.loss_cycle_texture_B + self.loss_perceptual_A + self.loss_perceptual_B
 
         self.loss_G.backward()

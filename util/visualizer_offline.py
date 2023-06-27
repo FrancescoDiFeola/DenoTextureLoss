@@ -275,7 +275,6 @@ class Visualizer():
         if epoch == 1 or epoch == 200:
             util.save_ordered_dict_as_csv(epoch_performance, csv_path2)
 
-
     # losses: same format as |losses| of plot_current_losses
     def print_current_losses(self, epoch, iters, losses, t_comp, t_data):
         """print current losses on console; also save the losses to the disk

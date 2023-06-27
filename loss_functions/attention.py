@@ -82,7 +82,12 @@ class Self_Attn(nn.Module):
 
 
 if __name__ == '__main__':
+
+    a = torch.zeros((2, 16))
+    print(torch.nonzero(a == 0).squeeze())
+    print(a)
+    '''
     attention = Self_Attn(1, 1, 'relu')
     tensor = torch.empty((16, 1, 4, 4))
     out, att = attention(tensor)
-    print(out.shape)
+    print(out.shape)'''
