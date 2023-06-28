@@ -28,6 +28,119 @@ def compute_wilcoxon_test(set1, set2):
 
 if __name__ == '__main__':
     baseline_1 = pd.read_csv(
+        '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_baseline_nw_1/metrics_test_1_epoch200.csv', header=None)
+    baseline_2 = pd.read_csv(
+        '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_baseline_nw_2/metrics_test_1_epoch200.csv', header=None)
+    baseline_3 = pd.read_csv(
+        '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_baseline_nw_3/metrics_test_1_epoch200.csv', header=None)
+
+    baseline_1 = convert_string_to_floats(baseline_1.iloc[1][1])
+    baseline_2 = convert_string_to_floats(baseline_2.iloc[1][1])
+    baseline_3 = convert_string_to_floats(baseline_3.iloc[1][1])
+
+    baseline_1_avg = np.mean(baseline_1)
+    baseline_2_avg = np.mean(baseline_2)
+    baseline_3_avg = np.mean(baseline_3)
+    overall_baseline = (baseline_1_avg + baseline_2_avg + baseline_3_avg)/3
+    std =np.std(np.array([baseline_1_avg, baseline_2_avg, baseline_3_avg]))
+
+    print(f'Baseline1: {baseline_1_avg}')
+    print(f'Baseline2: {baseline_2_avg}')
+    print(f'Baseline3: {baseline_3_avg}')
+    print(f'Overall: {overall_baseline}, Std: {std}')
+
+    ########################
+
+    texture_max_1 = pd.read_csv(
+        '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_texture_max_nw_1/metrics_test_1_epoch200.csv', header=None)
+    texture_max_2 = pd.read_csv(
+        '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_texture_max_nw_2/metrics_test_1_epoch200.csv', header=None)
+    texture_max_3 = pd.read_csv(
+        '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_texture_max_nw_3/metrics_test_1_epoch200.csv', header=None)
+
+    texture_max_1 = convert_string_to_floats(texture_max_1.iloc[1][1])
+    texture_max_2 = convert_string_to_floats(texture_max_2.iloc[1][1])
+    texture_max_3 = convert_string_to_floats(texture_max_3.iloc[1][1])
+
+    texture_max_avg_1 = np.mean(texture_max_1)
+    texture_max_avg_2 = np.mean(texture_max_2)
+    texture_max_avg_3 = np.mean(texture_max_3)
+    overall_texture_max = (texture_max_avg_1 + texture_max_avg_2 + texture_max_avg_3)/3
+    std =np.std(np.array([texture_max_avg_1, texture_max_avg_2, texture_max_avg_3]))
+
+    print(f'Texture_max1: {texture_max_avg_1}')
+    print(f'Texture_max2: {texture_max_avg_2}')
+    print(f'Texture_max3: {texture_max_avg_3}')
+    print(f'Overall: {overall_texture_max}, Std: {std}')
+
+    #########################
+
+    texture_avg_1 = pd.read_csv(
+        '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_texture_avg_nw_1/metrics_test_1_epoch200.csv', header=None)
+    texture_avg_2 = pd.read_csv(
+        '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_texture_avg_nw_2/metrics_test_1_epoch200.csv', header=None)
+    texture_avg_3 = pd.read_csv(
+        '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_texture_avg_nw_3/metrics_test_1_epoch200.csv', header=None)
+
+    texture_avg_1 = convert_string_to_floats(texture_avg_1.iloc[1][1])
+    texture_avg_2 = convert_string_to_floats(texture_avg_2.iloc[1][1])
+    texture_avg_3 = convert_string_to_floats(texture_avg_3.iloc[1][1])
+
+    texture_avg_avg_1 = np.mean(texture_avg_1)
+    texture_avg_avg_2 = np.mean(texture_avg_2)
+    texture_avg_avg_3 = np.mean(texture_avg_3)
+    overall_texture_avg = (texture_avg_avg_1 + texture_avg_avg_2 + texture_avg_avg_3)/3
+    std =np.std(np.array([texture_avg_avg_1, texture_avg_avg_2, texture_avg_avg_3]))
+
+    print(f'Texture_avg1: {texture_avg_avg_1}')
+    print(f'Texture_avg2: {texture_avg_avg_2}')
+    print(f'Texture_avg3: {texture_avg_avg_3}')
+    print(f'Overall: {overall_texture_avg}, Std: {std}')
+
+    ##############################
+
+    texture_frob_1 = pd.read_csv(
+        '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_texture_Frob_nw_1/metrics_test_1_epoch200.csv', header=None)
+    texture_frob_2 = pd.read_csv(
+        '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_texture_Frob_nw_2/metrics_test_1_epoch200.csv', header=None)
+    texture_frob_3 = pd.read_csv(
+        '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_texture_Frob_nw_3/metrics_test_1_epoch200.csv', header=None)
+
+    texture_frob_1 = convert_string_to_floats(texture_frob_1.iloc[1][1])
+    texture_frob_2 = convert_string_to_floats(texture_frob_2.iloc[1][1])
+    texture_frob_3 = convert_string_to_floats(texture_frob_3.iloc[1][1])
+
+    texture_frob_avg_1 = np.mean(texture_frob_1)
+    texture_frob_avg_2 = np.mean(texture_frob_2)
+    texture_frob_avg_3 = np.mean(texture_frob_3)
+    overall_texture_frob = (texture_frob_avg_1 + texture_frob_avg_2 + texture_frob_avg_3)/3
+    std =np.std(np.array([texture_frob_avg_1, texture_frob_avg_2, texture_frob_avg_3]))
+
+    print(f'Texture_frob1: {texture_frob_avg_1}')
+    print(f'Texture_frob2: {texture_frob_avg_2}')
+    print(f'Texture_frob3: {texture_frob_avg_3}')
+    print(f'Overall: {overall_texture_frob}, Std: {std}')
+    # average_baseline = [(x + y) / 2 for x, y in zip(baseline_1, baseline_2, baseline_3)]
+
+    plt.figure()
+    # plt.scatter([31.9714, 31.8105, 31.8427, 32.1373, 31.8319], [0.9626, 0.9594, 0.9580, 0.9614, 0.9588], marker='o')
+    plt.scatter([0.00072,  0.00068, 0.0007,  0.00067], [4.5409,  4.5629, 4.5319, 4.4439], marker='o',
+                color='orange')
+    plt.annotate('baseline', (0.00072, 4.5409))
+    plt.annotate('Texture max', (0.00068, 4.5629))
+    plt.annotate('Texture avg', (0.0007, 4.5319))
+    plt.annotate('Texture frob', (0.00067, 4.4439))
+
+    # plt.ylim([0.925, 1.02])
+    plt.legend(['Pix2Pix'])
+    plt.ylabel("NIQE")
+    plt.xlabel("MSE")
+    plt.grid()
+    plt.title('Average metrics at epoch 200 over 1 test patient (Mayo)')
+    plt.show()
+
+
+    """baseline_1 = pd.read_csv(
         '/Users/francescodifeola/Desktop/downloads_alvis/metrics_baseline_wind_1/metrics_test_1.csv', header=None)
     baseline_2 = pd.read_csv(
         '/Users/francescodifeola/Desktop/downloads_alvis/metrics_baseline_wind_2/metrics_test_1.csv', header=None)
@@ -65,7 +178,7 @@ if __name__ == '__main__':
     plt.plot(range(1, 201), average_texture_max)
     plt.legend(['baseline', 'texture_max'])
     plt.title('PSNR over epochs on the Mayo test (1 patient)')
-    plt.show()
+    plt.show()"""
 
     # texture_norm_1 = pd.read_csv(
     #    '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_texture_normalized_1/metrics_epoch200.csv',
