@@ -200,3 +200,8 @@ def load_saved_weights(model, saved_weights_path, device):
     saved_weights = torch.load(saved_weights_path, map_location=device)
     model.load_state_dict(saved_weights["state_dict"])
     return model
+
+
+def frobenious_dist(t1):
+        dot_prod = t1*t1
+        return torch.sqrt(torch.sum(dot_prod, dim=1))

@@ -193,7 +193,17 @@ def calculate_fretchet(images_real, images_fake, model):
 
 if __name__ == '__main__':
 
-    block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[64]
+
+    tensor_1 = torch.Tensor([[1,2,3],[1,2,5]])
+
+
+    def frobenious_dist(t1):
+        dot_prod = t1*t1
+        return torch.sqrt(torch.sum(dot_prod, dim=1))
+
+    print(frobenious_dist(tensor_1))
+
+    '''block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[64]
     model = InceptionV3([block_idx])
 
 
@@ -202,4 +212,4 @@ if __name__ == '__main__':
     fake_test_1_buffer = torch.ones((560, 3, 256, 256))
     fid = calculate_fretchet(real_test_1_buffer, fake_test_1_buffer, model)
     print(fid)
-    # model = model.cuda()
+    # model = model.cuda()'''

@@ -26,6 +26,7 @@ from util.visualizer_offline import Visualizer
 from util.util import save_ordered_dict_as_csv
 from tqdm import tqdm
 
+
 if __name__ == '__main__':
     opt = TrainOptions().parse()  # get training options
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options (train dataset)
@@ -55,23 +56,6 @@ if __name__ == '__main__':
     dataset_test_3 = create_dataset(opt)
     print(len(dataset_test_3))
 
-    # TEST
-    opt.isTrain = False
-    model.eval()
-    # are needed.
-    opt.test = 'test_1'
-    for j, data_test in tqdm(enumerate(dataset_test)):
-        model.set_input(data_test)  # unpack data from data loader
-        print(j)
-        model.test(j)  # run inference
-
-        # if j % 80 == 0:
-        #     visualizer.display_current_results(model.compute_test_visuals(), epoch, True)
-
-    model.avg_performance()
-    visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), 1, f'Average Metrics on {opt.test}')
-    model.empty_dictionary()
-
     for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):  # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
 
         epoch_start_time = time.time()  # timer for entire epoch
@@ -88,7 +72,7 @@ if __name__ == '__main__':
             model.set_input(data)  # unpack data from dataset and apply preprocessing
             model.optimize_parameters()  # calculate loss functions, get gradients, update network weights
 
-            if total_iters % opt.print_freq == 0:  # print training losses and save logging information to the disk
+            '''if total_iters % opt.print_freq == 0:  # print training losses and save logging information to the disk
                 current_losses = model.get_current_losses() # get the current loss values
                 t_comp = (time.time() - iter_start_time) / opt.batch_size  # get the avg time for each image in the batch
                 visualizer.print_current_losses(epoch, epoch_iter, current_losses, t_comp, t_data)  # print the current loss values
@@ -97,9 +81,10 @@ if __name__ == '__main__':
             if total_iters % opt.save_latest_freq == 0:  # cache our latest model every <save_latest_freq> iterations
                 print('saving the latest model (epoch %d, total_iters %d)' % (epoch, total_iters))
                 save_suffix = 'iter_%d' % total_iters if opt.save_by_iter else 'latest'
-                model.save_networks(save_suffix)
+                model.save_networks(save_suffix)'''
 
             iter_data_time = time.time()
+
 
         # TEST
         opt.isTrain = False
@@ -148,6 +133,7 @@ if __name__ == '__main__':
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
             model.save_networks('latest')
             model.save_networks(epoch)
+            model.save_texture_indexes()
         model.update_learning_rate()  # update learning rates at the end beginning of every epoch.
         print('End of epoch %d / %d \t Time Taken: %d sec' % (
             epoch, opt.n_epochs + opt.n_epochs_decay, time.time() - epoch_start_time))
