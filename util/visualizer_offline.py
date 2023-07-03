@@ -293,3 +293,10 @@ class Visualizer():
         print(message)  # print the message
         with open(self.log_name, "a") as log_file:
             log_file.write('%s\n' % message)  # save the message
+
+    def print_time(self, epoch, tot_epoch, delta_time):
+        message = 'End of epoch %d / %d \t Time Taken: %d sec' % (epoch, tot_epoch, delta_time)
+
+        print(message)  # print the message
+        with open(self.log_name, "a") as log_file:
+            log_file.write('%s\n' % message)  # save the message

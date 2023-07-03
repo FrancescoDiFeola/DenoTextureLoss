@@ -124,6 +124,19 @@ class BaseModel(ABC):
             self.load_networks(load_suffix)
         self.print_networks(opt.verbose)
 
+    # modified
+    def setup1(self, opt):
+        """Load and print networks; create schedulers
+
+        Parameters:
+            opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
+        """
+        if self.isTrain:
+            self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
+        if not self.isTrain or opt.continue_train:
+            self.load_networks_1(opt.epoch)
+        self.print_networks(opt.verbose)
+
     def eval(self):
         """Make models eval mode during test time"""
         for name in self.model_names:
@@ -312,6 +325,41 @@ class BaseModel(ABC):
                 for key in list(state_dict.keys()):  # need to copy keys here because we mutate in loop
                     self.__patch_instance_norm_state_dict(state_dict, net, key.split('.'))
                 net.load_state_dict(state_dict)
+
+    # modified
+    def load_networks_1(self, epoch):
+        """Load all the networks from the disk.
+
+        Parameters:
+            epoch (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
+        """
+        for name in self.model_names:
+            if isinstance(name, str):
+                load_filename = '%s_net_%s.pth' % (epoch, name)
+                load_path = os.path.join(self.save_dir, load_filename)
+                net = getattr(self, 'net' + name)
+                if isinstance(net, torch.nn.DataParallel):
+                    net = net.module
+                print('loading the model from %s' % load_path)
+                # if you are using PyTorch newer than 0.4 (e.g., built from
+                # GitHub source), you can remove str() on self.device
+                state_dict = torch.load(load_path, map_location=str(self.device))
+                if hasattr(state_dict, '_metadata'):
+                    del state_dict._metadata
+
+                # patch InstanceNorm checkpoints prior to 0.4
+                for key in list(state_dict.keys()):  # need to copy keys here because we mutate in loop
+                    self.__patch_instance_norm_state_dict(state_dict, net, key.split('.'))
+                net.load_state_dict(state_dict)
+
+        '''print('loading the model from %s' % load_path)
+        # if you are using PyTorch newer than 0.4 (e.g., built from
+        # GitHub source), you can remove str() on self.device
+        state_dict = torch.load(load_path, map_location=str(self.device))
+        print(state_dict)
+        if hasattr(state_dict, '_metadata'):
+            del state_dict._metadata'''
+
 
     def print_networks(self, verbose):
         """Print the total number of parameters in the network and (if verbose) network architecture

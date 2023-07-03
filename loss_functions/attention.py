@@ -43,6 +43,7 @@ class Self_AttnRes(nn.Module):
 
         out = self.gamma * out + x * 0.001
 
+
         return out, attention
 
 
@@ -60,6 +61,7 @@ class Self_Attn(nn.Module):
         self.gamma = nn.Parameter(torch.zeros(1))  # nn.Parameter is a convenient way to define a learnable parameters;
 
         self.softmax = nn.Softmax(dim=-1)
+        self.relu = nn.ReLU()
 
     def forward(self, x):
         """
@@ -74,11 +76,17 @@ class Self_Attn(nn.Module):
         proj_key = self.key_conv(x).view(m_batchsize, -1, width * height)  # B X C x (*W*H)
         energy = torch.bmm(proj_query, proj_key)  # transpose check
         attention = self.softmax(energy)  # BX (N) X (N)
+
         proj_value = self.value_conv(x).view(m_batchsize, -1, width * height)  # B X C X N
         out = torch.bmm(proj_value, attention.permute(0, 2, 1))
         out = out.view(m_batchsize, C, width, height)
-        print(self.gamma)
+
         out = self.gamma * out + x
+        print(self.gamma)
+        print(attention)
+        print(x)
+        print(out)
+
 
         return out, attention, self.gamma
 

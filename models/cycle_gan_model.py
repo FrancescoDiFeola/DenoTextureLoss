@@ -1,26 +1,21 @@
-import torch
 import itertools
+
+import torch
+
 from util.image_pool import ImagePool
 from util.util import *
 from .base_model import BaseModel, OrderedDict
 from . import networks
-from loss_functions import *
-import numpy as np
 from math import log10
 from skimage.metrics import structural_similarity
 from sewar.full_ref import vifp
-import cv2
-from skimage.feature import graycomatrix, graycoprops
-from torchmetrics.image.fid import FrechetInceptionDistance
-import torchvision.models as models
-from surgeon_pytorch import Inspect
 import os
 import pyiqa
 from .vgg import VGG
-import torch.nn.functional as F
 from loss_functions.attention import Self_Attn
 from .FID import *
-from torchviz import make_dot
+from loss_functions.perceptual_loss import perceptual_similarity_loss
+from loss_functions.texture_loss import texture_loss
 
 class CycleGANModel(BaseModel):
     """
@@ -177,7 +172,7 @@ class CycleGANModel(BaseModel):
             self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)  # define GAN loss.
             self.criterionCycle = torch.nn.L1Loss()
             self.criterionIdt = torch.nn.L1Loss()
-            self.criterionTexture = torch.nn.L1Loss(reduction='none')
+            self.criterionTexture = torch.nn.L1Loss(reduction='none')  # operator
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()),
                                                 lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -213,10 +208,14 @@ class CycleGANModel(BaseModel):
 
         The option 'direction' can be used to swap domain A and domain B.
         """
-        AtoB = self.opt.direction == 'AtoB'
-        self.real_A = input['A' if AtoB else 'B'].to(self.device)
-        self.real_B = input['B' if AtoB else 'A'].to(self.device)
-        self.image_paths = input['A_paths' if AtoB else 'B_paths']
+        if self.opt.dataset_mode == "LIDC_IDRI":
+            self.real_A = input['img']
+            self.image_paths = input['im_paths']
+        else:
+            AtoB = self.opt.direction == 'AtoB'
+            self.real_A = input['A' if AtoB else 'B'].to(self.device)
+            self.real_B = input['B' if AtoB else 'A'].to(self.device)
+            self.image_paths = input['A_paths' if AtoB else 'B_paths']
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
@@ -245,6 +244,7 @@ class CycleGANModel(BaseModel):
         if self.opt.test == 'test_3':
             # NIQE
             fake_B_3channel = self.fake_B.expand(-1, 3, -1, -1)
+
             self.NIQE = self.niqe(fake_B_3channel).item()
             self.mse = 0
             self.psnr = 0
@@ -341,94 +341,68 @@ class CycleGANModel(BaseModel):
         lambda_texture = self.opt.lambda_texture
         # Texture loss
         if lambda_texture > 0:
-            self.textures_real_A = self.texture_extractor(self.real_A)
-            self.textures_rec_A = self.texture_extractor(self.rec_A)
-            self.textures_real_B = self.texture_extractor(self.real_B)
-            self.textures_rec_B = self.texture_extractor(self.rec_B)
-
             if self.opt.texture_criterion == 'attention':
-
-                out_attention_A, map_A, weight_A = self.attention(
-                    self.criterionTexture(self.textures_rec_A, self.textures_real_A).view(2, 1, 4, 4))
-                out_attention_B, map_B, weight_B = self.attention(
-                    self.criterionTexture(self.textures_rec_B, self.textures_real_B).view(2, 1, 4, 4))
-
-                self.loss_cycle_texture_A = torch.sum(torch.sum(out_attention_A, dim=(2, 3))) * lambda_texture
-                print(self.loss_cycle_texture_A)
-                self.loss_cycle_texture_B = torch.sum(torch.sum(out_attention_B, dim=(2, 3))) * lambda_texture
-                print(self.loss_cycle_texture_B)
+                loss_texture_A, loss_texture_B, map_A, map_B, weight_A, weight_B = texture_loss(self.rec_A,
+                                                                                                self.rec_B,
+                                                                                                self.real_A,
+                                                                                                self.real_B,
+                                                                                                self.criterionTexture,
+                                                                                                self.opt,
+                                                                                                self.attention)
+                self.loss_cycle_texture_A = loss_texture_A * lambda_texture
+                self.loss_cycle_texture_B = loss_texture_B * lambda_texture
                 self.weight_A.append(weight_A)
                 self.weight_B.append(weight_B)
                 self.attention_A.append(map_A)
                 self.attention_B.append(map_B)
 
             elif self.opt.texture_criterion == 'max':
-
-                delta_grids_A = self.criterionTexture(self.textures_rec_A, self.textures_real_A).view(2, -1)  # change shape from BxCxHxW to Bx(HXW)
-                self.criterion_texture_A, _ = torch.max(delta_grids_A, dim=1)  # return a tensor 1xB
+                loss_texture_A, loss_texture_B, delta_grids_A, criterion_texture_A, delta_grids_B, criterion_texture_B = texture_loss(self.rec_A,
+                                                                                                                                      self.rec_B,
+                                                                                                                                      self.real_A,
+                                                                                                                                      self.real_B,
+                                                                                                                                      self.criterionTexture,
+                                                                                                                                      self.opt
+                                                                                                                                      )
 
                 # save the index of the maximum texture descriptor for each image in the batch
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[0]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[1]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[2]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[3]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[4]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[5]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[6]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[7]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[8]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[9]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[10]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[11]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[12]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[13]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[14]).squeeze())
-                self.index_texture_A.append(torch.nonzero(delta_grids_A == self.criterion_texture_A[15]).squeeze())
-
-
-                delta_grids_B = self.criterionTexture(self.textures_rec_B, self.textures_real_B).view(2, -1)
-                self.criterion_texture_B, _ = torch.max(delta_grids_B, dim=1)
-
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[0]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[1]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[2]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[3]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[4]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[5]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[6]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[7]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[8]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[9]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[10]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[11]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[12]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[13]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[14]).squeeze())
-                self.index_texture_B.append(torch.nonzero(delta_grids_B == self.criterion_texture_B[15]).squeeze())
+                print(criterion_texture_A)
+                for i in range(2):
+                    print(i)
+                    print(delta_grids_A)
+                    self.index_texture_A.append(torch.nonzero(delta_grids_A == criterion_texture_A[i]).squeeze())
+                    print(self.index_texture_A)
+                    self.index_texture_B.append(torch.nonzero(delta_grids_B == criterion_texture_B[i]).squeeze())
 
                 # compute the loss function by averaging over the batch
-                self.loss_cycle_texture_A = torch.mean(self.criterion_texture_A) * lambda_texture
-                self.loss_cycle_texture_B = torch.mean(self.criterion_texture_B) * lambda_texture
+                self.loss_cycle_texture_A = loss_texture_A * lambda_texture
+                self.loss_cycle_texture_B = loss_texture_B * lambda_texture
 
             elif self.opt.texture_criterion == 'average':
-                delta_grids_A = self.criterionTexture(self.textures_rec_A, self.textures_real_A).view(2, -1)  # change shape from BxCxHxW to Bx(HXW)
-                self.criterion_texture_A = torch.mean(delta_grids_A, dim=1)  # return a tensor 1xB
+                loss_texture_A, loss_texture_B = texture_loss(
+                                                            self.rec_A,
+                                                            self.rec_B,
+                                                            self.real_A,
+                                                            self.real_B,
+                                                            self.criterionTexture,
+                                                            self.opt
+                                                            )
 
-                delta_grids_B = self.criterionTexture(self.textures_rec_B, self.textures_real_B).view(2, -1)  # change shape from BxCxHxW to Bx(HXW)
-                self.criterion_texture_B = torch.mean(delta_grids_B, dim=1)  # return a tensor 1xB
-
-                self.loss_cycle_texture_A = torch.mean(self.criterion_texture_A) * lambda_texture
-                self.loss_cycle_texture_B = torch.mean(self.criterion_texture_B) * lambda_texture
+                self.loss_cycle_texture_A = loss_texture_A * lambda_texture
+                self.loss_cycle_texture_B = loss_texture_B * lambda_texture
 
             elif self.opt.texture_criterion == 'Frobenius':
-                delta_grids_A = self.criterionTexture(self.textures_rec_A, self.textures_real_A).view(2, -1)  # change shape from BxCxHxW to Bx(HXW)
-                self.criterion_texture_A = frobenious_dist(delta_grids_A)  # return a tensor 1xB
+                loss_texture_A, loss_texture_B = texture_loss(
+                                                            self.rec_A,
+                                                            self.rec_B,
+                                                            self.real_A,
+                                                            self.real_B,
+                                                            self.criterionTexture,
+                                                            self.opt
+                                                            )
 
-                delta_grids_B = self.criterionTexture(self.textures_rec_B, self.textures_real_B).view(2, -1)  # change shape from BxCxHxW to Bx(HXW)
-                self.criterion_texture_B = frobenious_dist(delta_grids_B)  # return a tensor 1xB
-
-                self.loss_cycle_texture_A = torch.mean(self.criterion_texture_A) * lambda_texture
-                self.loss_cycle_texture_B = torch.mean(self.criterion_texture_B) * lambda_texture
+                self.loss_cycle_texture_A = loss_texture_A * lambda_texture
+                self.loss_cycle_texture_B = loss_texture_B * lambda_texture
             else:
                 raise NotImplementedError
         else:
@@ -437,7 +411,7 @@ class CycleGANModel(BaseModel):
 
         lambda_perceptual = self.opt.lambda_perceptual
         if lambda_perceptual > 0:
-            loss_perceptual_A, loss_perceptual_B = self.perceptual_similarity_loss()
+            loss_perceptual_A, loss_perceptual_B = perceptual_similarity_loss(self.rec_A, self.rec_B, self.real_A, self.real_B, self.vgg, self.opt.perceptual_layers)
             self.loss_perceptual_A = loss_perceptual_A * lambda_perceptual
             self.loss_perceptual_B = loss_perceptual_B * lambda_perceptual
         else:
@@ -450,7 +424,6 @@ class CycleGANModel(BaseModel):
         self.loss_G_B = self.criterionGAN(self.netD_B(self.fake_A), True)
         # Forward cycle loss || G_B(G_A(A)) - A||
         self.loss_cycle_A = self.criterionCycle(self.rec_A, self.real_A) * lambda_A
-
         # Backward cycle loss || G_A(G_B(B)) - B||
         self.loss_cycle_B = self.criterionCycle(self.rec_B, self.real_B) * lambda_B
 
@@ -458,30 +431,7 @@ class CycleGANModel(BaseModel):
 
         self.loss_G.backward()
 
-    def create_grid_loss(self):
-        self.loss_grid_A[0] = self.loss_cycle_A
-        self.loss_grid_B[0] = self.loss_cycle_B
-        self.loss_grid_A[1] = self.loss_idt_A
-        self.loss_grid_B[1] = self.loss_idt_B
-        self.loss_grid_A[2] = self.loss_perceptual_A
-        self.loss_grid_B[2] = self.loss_perceptual_B
-        self.loss_grid_A[3] = self.m1_A
-        self.loss_grid_B[3] = self.m1_B
-        self.loss_grid_A[4] = self.m2_A
-        self.loss_grid_B[4] = self.m2_B
-        self.loss_grid_A[5] = self.m3_A
-        self.loss_grid_B[5] = self.m3_B
-        self.loss_grid_A[6] = self.m4_A
-        self.loss_grid_B[6] = self.m4_B
-        self.loss_grid_A[7] = self.m5_A
-        self.loss_grid_B[7] = self.m5_B
 
-        i = 8
-        for idx_1 in range(0, 4):
-            for idx_2 in range(0, 4):
-                self.loss_grid_A[i] = self.criterion_texture_A[0, 0, idx_1, idx_2]
-                self.loss_grid_B[i] = self.criterion_texture_B[0, 0, idx_1, idx_2]
-                i += 1
 
     def optimize_parameters(self):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
@@ -503,99 +453,8 @@ class CycleGANModel(BaseModel):
         self.backward_D_B()  # calculate graidents for D_B
         self.optimizer_D.step()  # update D_A and D_B's weights
 
-    def texture_extractor(self, x):
 
-        x = cv2.normalize(x.detach().cpu().numpy(), None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX,
-                          dtype=cv2.CV_32F).astype(np.uint8)
 
-        if self.opt.texture_offsets == 'all':
-            shape = (x.shape[0], 1, 4, 4)  # 4,4
-            spatial_offset = [1, 3, 5, 7]
-            angular_offset = [0, 45, 90, 135]
-        elif self.opt.texture_offsets == '5':
-            shape = (x.shape[0], 1, 1, 4)  # 4,4
-            spatial_offset = [5]
-            angular_offset = [0, 45, 90, 135]
-
-        texture_matrix = torch.empty(shape)
-
-        for i in range(0, x.shape[0]):
-            for idx_d, d in enumerate(spatial_offset):
-                for idx_theta, theta in enumerate(angular_offset):
-                    texture_d_theta = graycoprops(
-                        graycomatrix(x[i, 0, :, :], distances=[d], angles=[theta], levels=256, symmetric=True,
-                                     normed=True), "contrast")[0][0]
-                    texture_matrix[i, 0, idx_d - 1, idx_theta - 1] = texture_d_theta
-
-        return texture_matrix
-
-    def perceptual_similarity_loss(self):
-
-        rec_A = self.rec_A.expand(-1, 3, -1, -1)
-        rec_B = self.rec_B.expand(-1, 3, -1, -1)
-        real_A = self.real_A.expand(-1, 3, -1, -1)
-        real_B = self.real_B.expand(-1, 3, -1, -1)
-
-        f1_real_A, f2_real_A, f3_real_A, f4_real_A, f5_real_A = self.vgg_16_pretrained(
-            real_A)  # extract features from vgg
-        f1_real_B, f2_real_B, f3_real_B, f4_real_B, f5_real_B = self.vgg_16_pretrained(real_B)
-
-        f1_rec_A, f2_rec_A, f3_rec_A, f4_rec_A, f5_rec_A = self.vgg_16_pretrained(
-            rec_A)  # extract features from vgg (1st,2nd, 3rd, 4th, 5th pool)
-        f1_rec_B, f2_rec_B, f3_rec_B, f4_rec_B, f5_rec_B = self.vgg_16_pretrained(rec_B)
-
-        if self.opt.perceptual_layers == 'all':
-            self.m1_A = torch.mean(torch.mean((f1_real_A - f1_rec_A) ** 2))  # mse difference
-            self.m2_A = torch.mean(torch.mean((f2_real_A - f2_rec_A) ** 2))
-            self.m3_A = torch.mean(torch.mean((f3_real_A - f3_rec_A) ** 2))
-            self.m4_A = torch.mean(torch.mean((f4_real_A - f4_rec_A) ** 2))
-            self.m5_A = torch.mean(torch.mean((f5_real_A - f5_rec_A) ** 2))
-
-            self.m1_B = torch.mean(torch.mean((f1_real_B - f1_rec_B) ** 2))
-            self.m2_B = torch.mean(torch.mean((f2_real_B - f2_rec_B) ** 2))
-            self.m3_B = torch.mean(torch.mean((f3_real_B - f3_rec_B) ** 2))
-            self.m4_B = torch.mean(torch.mean((f4_real_B - f4_rec_B) ** 2))
-            self.m5_B = torch.mean(torch.mean((f5_real_B - f5_rec_B) ** 2))
-
-            perceptual_loss_A = self.m1_A + self.m2_A + self.m3_A + self.m4_A + self.m5_A
-            perceptual_loss_B = self.m1_B + self.m2_B + self.m3_B + self.m4_B + self.m5_B
-        elif self.opt.perceptual_layers == '1-2':
-            m1_A = torch.mean(torch.mean((f1_real_A - f1_rec_A) ** 2))  # mse difference
-            m2_A = torch.mean(torch.mean((f2_real_A - f2_rec_A) ** 2))
-
-            m1_B = torch.mean(torch.mean((f1_real_B - f1_rec_B) ** 2))
-            m2_B = torch.mean(torch.mean((f2_real_B - f2_rec_B) ** 2))
-            perceptual_loss_A = m1_A + m2_A
-            perceptual_loss_B = m1_B + m2_B
-        elif self.opt.perceptual_layers == '4-5':
-            m4_A = torch.mean(torch.mean((f4_real_A - f4_rec_A) ** 2))
-            m5_A = torch.mean(torch.mean((f5_real_A - f5_rec_A) ** 2))
-
-            m4_B = torch.mean(torch.mean((f4_real_B - f4_rec_B) ** 2))
-            m5_B = torch.mean(torch.mean((f5_real_B - f5_rec_B) ** 2))
-
-            perceptual_loss_A = m4_A + m5_A
-            perceptual_loss_B = m4_B + m5_B
-        elif self.opt.perceptual_layers == '2-4':
-
-            m2_A = torch.mean(torch.mean((f2_real_A - f2_rec_A) ** 2))
-            m4_A = torch.mean(torch.mean((f4_real_A - f4_rec_A) ** 2))
-
-            m2_B = torch.mean(torch.mean((f2_real_B - f2_rec_B) ** 2))
-            m4_B = torch.mean(torch.mean((f4_real_B - f4_rec_B) ** 2))
-
-            perceptual_loss_A = m2_A + m4_A
-            perceptual_loss_B = m2_B + m4_B
-
-        return perceptual_loss_A, perceptual_loss_B
-
-    # EXTRACT THE POOLING LAYERS FROM THE PRETRAINED VGG-16
-    def vgg_16_pretrained(self, image):
-        wrapped_model = Inspect(self.vgg,
-                                layer=['features.4', 'features.9', 'features.16', 'features.23', 'features.30'])
-        _, [p1, p2, p3, p4, p5] = wrapped_model(image)
-
-        return p1, p2, p3, p4, p5
 
     def save_texture_indexes(self):
         save_list_to_csv(self.index_texture_A, f'{self.loss_dir}/idx_texture_A.csv')
@@ -615,12 +474,4 @@ class CycleGANModel(BaseModel):
         torch.save(weight_A, f"{self.loss_dir}/weight_A.pt")
         torch.save(weight_B, f"{self.loss_dir}/weight_B.pt")
 
-    def attention(self):
 
-        activated_A = F.relu(self.loss_grid_A)
-        alpha_A = torch.sigmoid(activated_A)
-        self.loss_weighted_A = alpha_A * self.loss_grid_A
-
-        activated_B = F.relu(self.loss_grid_B)
-        alpha_B = torch.sigmoid(activated_B)
-        self.loss_weighted_B = alpha_B * self.loss_grid_B

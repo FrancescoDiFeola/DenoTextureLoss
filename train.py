@@ -34,7 +34,7 @@ if __name__ == '__main__':
     print('The number of training images = %d' % dataset_size)
 
     model = create_model(opt)  # create a model given opt.model and other options
-    model.setup(opt)  # regular setup: load and print networks; create schedulers
+    model.setup1(opt)  # regular setup: load and print networks; create schedulers
     visualizer = Visualizer(opt)  # create a visualizer that display/save images and plots
     total_iters = 0  # the total number of training iterations
 
@@ -52,11 +52,11 @@ if __name__ == '__main__':
 
     # Test 3 (8 patient from LIDC/IDRI)
     opt.text_file = "./data/LIDC_test.csv"  # load the csv file containing test data info
-    opt.dataset_mode = "LIDC_IDRI"
     dataset_test_3 = create_dataset(opt)
     print(len(dataset_test_3))
 
-    for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):  # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
+    for epoch in range(opt.epoch_count,
+                       opt.n_epochs + opt.n_epochs_decay + 1):  # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
 
         epoch_start_time = time.time()  # timer for entire epoch
         iter_data_time = time.time()  # timer for data loading per iteration
@@ -64,76 +64,80 @@ if __name__ == '__main__':
         visualizer.reset()  # reset the visualizer: make sure it saves the results to HTML at least once every epoch
         for i, data in enumerate(dataset):  # inner loop within one epoch
             iter_start_time = time.time()  # timer for computation per iteration
-            if total_iters % opt.print_freq == 0:
-                t_data = iter_start_time - iter_data_time
 
             total_iters += opt.batch_size
             epoch_iter += opt.batch_size
             model.set_input(data)  # unpack data from dataset and apply preprocessing
             model.optimize_parameters()  # calculate loss functions, get gradients, update network weights
 
-            '''if total_iters % opt.print_freq == 0:  # print training losses and save logging information to the disk
-                current_losses = model.get_current_losses() # get the current loss values
-                t_comp = (time.time() - iter_start_time) / opt.batch_size  # get the avg time for each image in the batch
-                visualizer.print_current_losses(epoch, epoch_iter, current_losses, t_comp, t_data)  # print the current loss values
-                tracked_losses = model.track_current_losses()
-                visualizer.plot_current_losses(epoch, float(epoch_iter) / dataset_size, current_losses, tracked_losses, 'Loss_functions')
-            if total_iters % opt.save_latest_freq == 0:  # cache our latest model every <save_latest_freq> iterations
-                print('saving the latest model (epoch %d, total_iters %d)' % (epoch, total_iters))
-                save_suffix = 'iter_%d' % total_iters if opt.save_by_iter else 'latest'
-                model.save_networks(save_suffix)'''
+        t_data = iter_start_time - iter_data_time
+        current_losses = model.get_current_losses()
+        t_comp = (time.time() - iter_start_time) / opt.batch_size
+        visualizer.print_current_losses(epoch, epoch_iter, current_losses, t_comp, t_data)
+        tracked_losses = model.track_current_losses()
+        visualizer.plot_current_losses(epoch, float(epoch_iter) / dataset_size, current_losses, tracked_losses,
+                                       'Loss_functions')
 
-            iter_data_time = time.time()
+        print('saving the latest model (epoch %d, total_iters %d)' % (epoch, total_iters))
+        save_suffix = 'iter_%d' % total_iters if opt.save_by_iter else 'latest'
+        model.save_networks(save_suffix)
 
+        iter_data_time = time.time()
 
         # TEST
-        opt.isTrain = False
-        model.eval()
-        # are needed.
-        opt.test = 'test_1'
-        for j, data_test in enumerate(dataset_test):
-            model.set_input(data_test)  # unpack data from data loader
-            model.test(j)  # run inference
+        test_time = 0
+        if epoch == 1 or epoch == 50 or epoch == 200:
+            test_start = time.time()
+            opt.isTrain = False
+            model.eval()
+            # are needed.
+            opt.test = 'test_1'
+            for j, data_test in enumerate(dataset_test):
+                model.set_input(data_test)  # unpack data from data loader
+                model.test(j)  # run inference
 
-            if j % 80 == 0:
-                visualizer.display_current_results(model.compute_test_visuals(), epoch, True)
+            model.avg_performance()
+            visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch,
+                                    f'Average Metrics on {opt.test}')
+            model.empty_dictionary()
 
-        model.avg_performance()
-        # visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch, f'Average Metrics on {opt.test}')
-        model.empty_dictionary()
+            opt.test = 'test_2'
+            for j, data_test in enumerate(dataset_test_2):
+                model.set_input(data_test)  # unpack data from data loader
+                model.test(j)  # run inference
 
-        opt.test = 'test_2'
-        for j, data_test in enumerate(dataset_test_2):
-            model.set_input(data_test)  # unpack data from data loader
-            model.test(j)  # run inference
+            model.avg_performance()
+            visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch,
+                                    f'Average Metrics on {opt.test}')
+            model.empty_dictionary()
 
-            if j % 80 == 0:
-                visualizer.display_current_results(model.compute_test_visuals(), epoch, True)
+            opt.test = 'test_3'
+            opt.dataset_mode = "LIDC_IDRI"
+            for j, data_test in enumerate(dataset_test_3):
+                model.set_input(data_test)  # unpack data from data loader
+                model.test(j)  # run inference
 
-        model.avg_performance()
-        # visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch, f'Average Metrics on {opt.test}')
-        model.empty_dictionary()
+            model.avg_performance()
+            visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch,
+                                    f'Average Metrics on {opt.test}')
+            model.empty_dictionary()
 
-        opt.test = 'test_3'
-        for j, data_test in enumerate(dataset_test_2):
-            model.set_input(data_test)  # unpack data from data loader
-            model.test(j)  # run inference
-
-            if j % 80 == 0:
-                visualizer.display_current_results(model.compute_test_visuals(), epoch, True)
-
-        model.avg_performance()
-        # visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), epoch, f'Average Metrics on {opt.test}')
-        model.empty_dictionary()
-        opt.isTrain = True
-        model.train()
-        ##########
+            opt.isTrain = True
+            model.train()
+            test_end = time.time()
+            test_time = test_end - test_start
+            ##########
 
         if epoch % opt.save_epoch_freq == 0:  # cache our model every <save_epoch_freq> epochs
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
             model.save_networks('latest')
             model.save_networks(epoch)
-            model.save_texture_indexes()
+            # model.save_texture_indexes()
+            if epoch == 1 or epoch == 20 or epoch == 50 or epoch == 100 or epoch == 200:
+                model.save_attention_maps()
+                model.save_attention_weights()
+
         model.update_learning_rate()  # update learning rates at the end beginning of every epoch.
         print('End of epoch %d / %d \t Time Taken: %d sec' % (
-            epoch, opt.n_epochs + opt.n_epochs_decay, time.time() - epoch_start_time))
+            epoch, opt.n_epochs + opt.n_epochs_decay, (time.time() - epoch_start_time) - test_time))
+        visualizer.print_time(epoch, opt.n_epochs + opt.n_epochs_decay, time.time() - epoch_start_time)
