@@ -1,16 +1,21 @@
-import torch
 from .base_model import BaseModel, OrderedDict
 from . import networks
 import os
+import itertools
 from .vgg import VGG
 from util.util import tensor2im2, save_list_to_csv
 import cv2
-from skimage.feature import graycomatrix, graycoprops
-import numpy as np
 from math import log10
 from skimage.metrics import structural_similarity
 from sewar.full_ref import vifp
 from surgeon_pytorch import Inspect
+import pyiqa
+from loss_functions.attention import Self_Attn
+from metrics.FID import *
+from metrics.mse_psnr_ssim_vif import mean_squared_error, peak_signal_to_noise_ratio, structural_similarity_index, vif
+from loss_functions.texture_loss import texture_loss
+from loss_functions.perceptual_loss import perceptual_similarity_loss
+from models.networks import init_net
 
 class Pix2PixModel(BaseModel):
     """ This class implements the pix2pix model, for learning a mapping from input images to output images given paired data.
@@ -22,6 +27,7 @@ class Pix2PixModel(BaseModel):
 
     pix2pix paper: https://arxiv.org/pdf/1611.07004.pdf
     """
+
     @staticmethod
     def modify_commandline_options(parser, is_train=True):
         """Add new dataset-specific options, and rewrite default values for existing options.
@@ -38,7 +44,7 @@ class Pix2PixModel(BaseModel):
         By default, we use vanilla GAN loss, UNet with batchnorm, and aligned datasets.
         """
         # changing the default values to match the pix2pix paper (https://phillipi.github.io/pix2pix/)
-        parser.set_defaults(norm='batch', netG='unet_256')
+        parser.set_defaults(norm='batch', netG='unet_256', dataset_mode='aligned')
         if is_train:
             parser.set_defaults(pool_size=0, gan_mode='vanilla')
             parser.add_argument('--lambda_L1', type=float, default=100.0, help='weight for L1 loss')
@@ -60,7 +66,6 @@ class Pix2PixModel(BaseModel):
             parser.add_argument('--vgg_model_path', type=str, default=None, help='finetuned vgg model path.')
             parser.add_argument('--lambda_perceptual', type=float, default=0.1, help='use perceptual loss.')
             parser.add_argument('--perceptual_layers', type=str, default='all', help='choose the perceptual layers.')
-
 
         return parser
 
@@ -86,23 +91,39 @@ class Pix2PixModel(BaseModel):
             self.error_store[key] = list()
 
         self.test_visual_names = ['real_A', 'fake_B', 'real_B']
-        self.metric_names = ['psnr', 'ssim', 'vif']
+        self.metric_names = ['psnr', 'mse', 'ssim', 'vif', 'NIQE', 'FID']
         self.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web')
         self.loss_dir = os.path.join(self.web_dir, f'{opt.loss_folder}')
 
         self.metrics_eval = OrderedDict()
         for key in self.metric_names:
             self.metrics_eval[key] = list()
-        self.avg_metrics = OrderedDict()
+
+        self.avg_metrics_test_1 = OrderedDict()
+        self.avg_metrics_test_2 = OrderedDict()
+        self.avg_metrics_test_3 = OrderedDict()
 
         for key in self.metric_names:
-            self.avg_metrics[key] = OrderedDict()
-            self.avg_metrics[key]['mean'] = list()
-            self.avg_metrics[key]['std'] = list()
+            self.avg_metrics_test_1[key] = OrderedDict()
+            self.avg_metrics_test_2[key] = OrderedDict()
+            self.avg_metrics_test_3[key] = OrderedDict()
 
-        # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
-        self.visual_names = ['real_A', 'fake_B', 'real_B']
-        # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
+            self.avg_metrics_test_1[key]['mean'] = list()
+            self.avg_metrics_test_1[key]['std'] = list()
+            self.avg_metrics_test_2[key]['mean'] = list()
+            self.avg_metrics_test_2[key]['std'] = list()
+            self.avg_metrics_test_3[key]['mean'] = list()
+            self.avg_metrics_test_3[key]['std'] = list()
+
+        # self.fid = FrechetInceptionDistance(feature=64, normalize=True)
+        block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
+        self.inception_model = InceptionV3([block_idx])
+
+        self.real_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
+        self.fake_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
+
+        self.niqe = pyiqa.create_metric('niqe', device=torch.device('cpu'), as_loss=False)
+
         if self.isTrain:
             self.model_names = ['G', 'D']
         else:  # during test time, only load G
@@ -120,18 +141,25 @@ class Pix2PixModel(BaseModel):
             self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)
             self.criterionL1 = torch.nn.L1Loss()
             self.criterionTexture = torch.nn.L1Loss(reduction='none')
+            if opt.texture_criterion == 'attention':
+                self.attention = init_net(Self_Attn(1, 'relu'))
+                self.weight = list()
+                self.attention_B = list()
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
-            self.optimizer_G = torch.optim.Adam(self.netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG.parameters(), self.attention.parameters()), lr=opt.lr,
+                                                betas=(opt.beta1, 0.999))
             self.optimizer_D = torch.optim.Adam(self.netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
+
             if opt.lambda_perceptual > 0.0:
                 if opt.vgg_pretrained == True:
                     self.vgg = VGG().to(int(opt.gpu_ids[1]))
                 else:
-                    self.vgg = VGG(num_classes=4, pretrained=False, init_type='finetuned', saved_weights_path=opt.vgg_model_path).to(int(opt.gpu_ids[1]))
-            self.index_texture_A = list()
-            self.index_texture_B = list()
+                    self.vgg = VGG(num_classes=4, pretrained=False, init_type='finetuned',
+                                   saved_weights_path=opt.vgg_model_path).to(int(opt.gpu_ids[1]))
+
+            self.index_texture = list()
 
     def set_input(self, input):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -141,45 +169,68 @@ class Pix2PixModel(BaseModel):
 
         The option 'direction' can be used to swap images in domain A and domain B.
         """
-        AtoB = self.opt.direction == 'AtoB'
-        self.real_A = input['A' if AtoB else 'B'].to(self.device)
-        self.real_B = input['B' if AtoB else 'A'].to(self.device)
-        self.image_paths = input['A_paths' if AtoB else 'B_paths']
+        if self.opt.dataset_mode == "LIDC_IDRI":
+            self.real_A = input['img']
+            self.image_paths = input['im_paths']
+        else:
+            AtoB = self.opt.direction == 'AtoB'
+            self.real_A = input['A' if AtoB else 'B'].to(self.device)
+            self.real_B = input['B' if AtoB else 'A'].to(self.device)
+            self.image_paths = input['A_paths' if AtoB else 'B_paths']
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         self.fake_B = self.netG(self.real_A)  # G(A)
 
-    def test(self):
+    def test(self, idx):
+
         with torch.no_grad():
+            self.real_test_buffer = torch.cat([self.real_test_buffer, ((self.real_B + 1) * 0.5).expand(-1, 3, -1, -1)],
+                                              dim=0)
             self.fake_B = self.netG(self.real_A)
-            self.compute_metrics()
+            self.fake_test_buffer = torch.cat([self.fake_test_buffer, ((self.fake_B + 1) * 0.5).expand(-1, 3, -1, -1)],
+                                              dim=0)
+            self.compute_metrics(idx)
             self.track_metrics()
 
-    def compute_metrics(self):
+    def compute_metrics(self, idx):
+        if self.opt.test == 'test_3' or self.opt.test == 'elcap':
+            # NIQE
+            fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
+            self.NIQE = self.niqe(fake_B_3channels).item()
+            self.mse = 0
+            self.psnr = 0
+            self.ssim = 0
+            self.vif = 0
+        else:
+            x = tensor2im2(self.real_B)
+            y = tensor2im2(self.fake_B)
+            # MSE
+            self.mse = mean_squared_error(x, y)
+            # PSNR
+            self.psnr = peak_signal_to_noise_ratio(x, y)
+            # SSIM
+            self.ssim = structural_similarity_index(x, y)
+            # NIQE
+            fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
+            self.NIQE = self.niqe(fake_B_3channels).item()
+            # VIF
+            self.vif = vif(x, y)
+            # FID
+            self.compute_fid(idx)
 
-        x = tensor2im2(self.real_B)
-        y = tensor2im2(self.fake_B)
-
-        # PSNR
-        mse = np.square(np.subtract(x, y)).mean()
-        if mse == 0:  # MSE is zero means no noise is present in the signal. Therefore, PSNR have no importance.
-            self.psnr = 100
-        max_pixel = 1
-
-        self.psnr = 10 * log10((max_pixel ** 2) / mse)
-
-        # SSIM
-        self.ssim = structural_similarity(x, y, data_range=2)
-
-        # VIF
-        self.vif = vifp(x, y)
-
+    def compute_fid(self, idx):
+        if idx == self.opt.dataset_len - 1:
+            fid_index = calculate_frechet(self.real_test_buffer, self.fake_test_buffer, self.inception_model)
+            self.metrics_eval['FID'].append(fid_index)
+        else:
+            pass
 
     def backward_D(self):
         """Calculate GAN loss for the discriminator"""
         # Fake; stop backprop to the generator by detaching fake_B
-        fake_AB = torch.cat((self.real_A, self.fake_B), 1)  # we use conditional GANs; we need to feed both input and output to the discriminator
+        fake_AB = torch.cat((self.real_A, self.fake_B),
+                            1)  # we use conditional GANs; we need to feed both input and output to the discriminator
         pred_fake = self.netD(fake_AB.detach())
         self.loss_D_fake = self.criterionGAN(pred_fake, False)
         # Real
@@ -200,115 +251,73 @@ class Pix2PixModel(BaseModel):
         # Texture loss
         if lambda_texture > 0:
 
-            self.textures_real_B = self.texture_extractor(self.real_B)
-            self.textures_fake_B = self.texture_extractor(self.fake_B)
-            criterion_texture_B = self.criterionTexture(self.textures_fake_B, self.textures_real_B)
+            if self.opt.texture_criterion == 'attention':
+                loss_texture, map_B, weight_B = texture_loss(self.fake_B, self.real_B, self.criterionTexture, self.opt,
+                                                             self.attention)
+                self.loss_texture = loss_texture * lambda_texture
+
+                self.weight.append(weight_B.item())
+                # self.attention_B.append(map_B)
 
             if self.opt.texture_criterion == 'max':
-                loss_cycle_texture_B = torch.max(criterion_texture_B)
-                self.index_texture_B.append(torch.where(criterion_texture_B == loss_cycle_texture_B)[2:])
-                self.loss_texture = loss_cycle_texture_B * lambda_texture
+                loss_texture, delta_grids_B, criterion_texture_B = texture_loss(self.fake_B, self.real_B,
+                                                                                self.criterionTexture, self.opt)
 
-            elif self.opt.texture_criterion == 'normalized':
-                normalizing_factor_real_B = torch.max(self.textures_real_B)
-                loss_cycle_texture_B = torch.sum(criterion_texture_B) / normalizing_factor_real_B
-                self.loss_texture = loss_cycle_texture_B * 1
+                # save the index of the maximum texture descriptor for each image in the batch
+                for i in range(2):
+                    self.index_texture.append(torch.nonzero(delta_grids_B == criterion_texture_B[i]).squeeze())
+
+                # compute the loss function by averaging over the batch
+                self.loss_texture = loss_texture * lambda_texture
 
             elif self.opt.texture_criterion == 'average':
-                self.loss_texture = torch.mean(criterion_texture_B) * lambda_texture
+                loss_texture = texture_loss(self.fake_B, self.real_B, self.criterionTexture, self.opt)
+
+                self.loss_texture = loss_texture * lambda_texture
+
+            elif self.opt.texture_criterion == 'Frobenius':
+                loss_texture = texture_loss(self.fake_B, self.real_B, self.criterionTexture, self.opt)
+
+                self.loss_texture = loss_texture * lambda_texture
             else:
                 raise NotImplementedError
         else:
-            self.loss_cycle_texture = 0
+            self.loss_texture = 0
 
         lambda_perceptual = self.opt.lambda_perceptual
         if lambda_perceptual > 0:
-            loss_perceptual_B = self.perceptual_similarity_loss()
-            self.loss_perceptual_B = loss_perceptual_B * lambda_perceptual
+            loss_perceptual = perceptual_similarity_loss(self.fake_B, self.real_B, self.vgg, self.opt.perceptual_layers)
+            self.loss_perceptual = loss_perceptual * lambda_perceptual
         else:
-            self.loss_perceptual_B = 0
+            self.loss_perceptual = 0
 
         self.loss_G_GAN = self.criterionGAN(pred_fake, True)
         # Second, G(A) = B
         self.loss_G_L1 = self.criterionL1(self.fake_B, self.real_B) * self.opt.lambda_L1
         # combine loss and calculate gradients
-        self.loss_G = self.loss_G_GAN + self.loss_G_L1
+        self.loss_G = self.loss_G_GAN + self.loss_G_L1 + self.loss_texture + self.loss_perceptual
         self.loss_G.backward()
 
     def optimize_parameters(self):
-        self.forward()                   # compute fake images: G(A)
+        self.forward()  # compute fake images: G(A)
         # update D
         self.set_requires_grad(self.netD, True)  # enable backprop for D
-        self.optimizer_D.zero_grad()     # set D's gradients to zero
-        self.backward_D()                # calculate gradients for D
-        self.optimizer_D.step()          # update D's weights
+        self.optimizer_D.zero_grad()  # set D's gradients to zero
+        self.backward_D()  # calculate gradients for D
+        self.optimizer_D.step()  # update D's weights
         # update G
         self.set_requires_grad(self.netD, False)  # D requires no gradients when optimizing G
-        self.optimizer_G.zero_grad()        # set G's gradients to zero
-        self.backward_G()                   # calculate graidents for G
-        self.optimizer_G.step()             # update G's weights
+        self.optimizer_G.zero_grad()  # set G's gradients to zero
+        self.backward_G()  # calculate graidents for G
+        self.optimizer_G.step()  # update G's weights
 
-    def texture_extractor(self, x):
+    def save_texture_indexes(self):
+        save_list_to_csv(self.index_texture, f'{self.loss_dir}/idx_texture.csv')
 
-        x = cv2.normalize(x.detach().cpu().numpy(), None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX,
-                          dtype=cv2.CV_32F).astype(np.uint8)
+    def save_attention_maps(self):
+        np.save(f"{self.loss_dir}/attention_B.npy", np.array(self.attention_B))
 
-        if self.opt.texture_offsets == 'all':
-            shape = (x.shape[0], 1, 4, 4)  # 4,4
-            spatial_offset = [1, 3, 5, 7]
-            angular_offset = [0, 45, 90, 135]
-        elif self.opt.texture_offsets == '5':
-            shape = (x.shape[0], 1, 1, 4)  # 4,4
-            spatial_offset = [5]
-            angular_offset = [0, 45, 90, 135]
-
-        texture_matrix = torch.empty(shape)
-
-        for i in range(0, x.shape[0]):
-            for idx_d, d in enumerate(spatial_offset):
-                for idx_theta, theta in enumerate(angular_offset):
-                    texture_d_theta = graycoprops(
-                        graycomatrix(x[i, 0, :, :], distances=[d], angles=[theta], levels=256, symmetric=True,
-                                     normed=True), "contrast")[0][0]
-                    texture_matrix[i, 0, idx_d - 1, idx_theta - 1] = texture_d_theta
-
-        return texture_matrix
-
-    def perceptual_similarity_loss(self):
+    def save_attention_weights(self):
+        np.save(f"{self.loss_dir}/weight.npy", np.array(self.weight))
 
 
-        fake_B = self.rec_B.expand(-1, 3, -1, -1)
-        real_B = self.real_B.expand(-1, 3, -1, -1)
-
-        f1_real_B, f2_real_B, f3_real_B, f4_real_B, f5_real_B = self.vgg_16_pretrained(real_B)
-
-        f1_fake_B, f2_fake_B, f3_fake_B, f4_fake_B, f5_fake_B = self.vgg_16_pretrained(fake_B)
-
-        if self.opt.perceptual_layers == 'all':
-            m1_B = torch.mean(torch.mean((f1_real_B - f1_fake_B) ** 2))
-            m2_B = torch.mean(torch.mean((f2_real_B - f2_fake_B) ** 2))
-            m3_B = torch.mean(torch.mean((f3_real_B - f3_fake_B) ** 2))
-            m4_B = torch.mean(torch.mean((f4_real_B - f4_fake_B) ** 2))
-            m5_B = torch.mean(torch.mean((f5_real_B - f5_fake_B) ** 2))
-            perceptual_loss_B = m1_B + m2_B + m3_B + m4_B + m5_B
-        elif self.opt.perceptual_layers == '1-2':
-            m1_B = torch.mean(torch.mean((f1_real_B - f1_fake_B) ** 2))
-            m2_B = torch.mean(torch.mean((f2_real_B - f2_fake_B) ** 2))
-            perceptual_loss_B = m1_B + m2_B
-        elif self.opt.perceptual_layers == '4-5':
-            m4_B = torch.mean(torch.mean((f4_real_B - f4_fake_B) ** 2))
-            m5_B = torch.mean(torch.mean((f5_real_B - f5_fake_B) ** 2))
-            perceptual_loss_B = m4_B + m5_B
-        elif self.opt.perceptual_layers == '2-4':
-            m2_B = torch.mean(torch.mean((f2_real_B - f2_fake_B) ** 2))
-            m4_B = torch.mean(torch.mean((f4_real_B - f4_fake_B) ** 2))
-            perceptual_loss_B = m2_B + m4_B
-
-        return  perceptual_loss_B
-
-    # EXTRACT THE POOLING LAYERS FROM THE PRETRAINED VGG-16
-    def vgg_16_pretrained(self, image):
-        wrapped_model = Inspect(self.vgg, layer=['features.4', 'features.9', 'features.16', 'features.23', 'features.30'])
-        _, [p1, p2, p3, p4, p5] = wrapped_model(image)
-
-        return p1, p2, p3, p4, p5

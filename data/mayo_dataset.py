@@ -97,7 +97,7 @@ class MayoDataset(BaseDataset):
         self.window_center = opt.window_center
         self.A_size = len(self.annotations_A)  # get the size of dataset A
         self.B_size = len(self.annotations_B)  # get the size of dataset B
-        self.dataset_len = max(self.A_size, self.B_size)
+        self.opt.dataset_len = max(self.A_size, self.B_size)
         self.plot_verbose = opt.plot_verbose
         # btoA = self.opt.direction == 'BtoA'
 

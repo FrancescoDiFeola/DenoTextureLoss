@@ -51,23 +51,23 @@ if __name__ == '__main__':
     opt.isTrain = False
     opt.epoch = 200
     model = create_model(opt)  # create a model given opt.model and other options
-    model.setup1(opt)  # regular setup: load and print networks; create schedulers
+    model.setup(opt)  # regular setup: load and print networks; create schedulers
     visualizer = Visualizer(opt)  # create a visualizer that display/save images and plots
     # Test 3 (8 patient from LIDC/IDRI)
     opt.isTrain = False
     model.eval()
-    opt.text_file = "./data/LIDC_test.csv"  # load the csv file containing test data info
-    opt.dataset_mode = "LIDC_IDRI"
+    opt.text_file = "./data/mayo_test_1p.csv"  # load the csv file containing test data info
+    # opt.dataset_mode = "LIDC_IDRI"
     opt.batch_size = 1
-    dataset_test_3 = create_dataset(opt)
-    print(len(dataset_test_3))
-    opt.test = 'test_3'
-
-    for j, data_test in tqdm(enumerate(dataset_test_3)):
+    opt.serial_batches = True
+    dataset_test = create_dataset(opt)
+    print(len(dataset_test))
+    opt.test = 'test_1'
+    for j, data_test in tqdm(enumerate(dataset_test)):
         # print(data_test['img'].shape)
         model.set_input(data_test)  # unpack data from data loader
         model.test(j)  # run inference
 
     model.avg_performance()
-    visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), 200, f'Average Metrics on {opt.test}')
+    visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), 200, f'Average Metrics on {opt.test}', 'baseline_windowing_7')
     model.empty_dictionary()

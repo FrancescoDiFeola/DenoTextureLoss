@@ -6,6 +6,7 @@ import numpy as np
 from torch.nn.functional import adaptive_avg_pool2d
 from scipy import linalg
 
+
 class InceptionV3(nn.Module):
     """Pretrained InceptionV3 network returning feature maps"""
 
@@ -131,7 +132,7 @@ def calculate_activation_statistics(images, model, batch_size=128, dims=2048, cu
         batch = images
     pred = model(batch)[0]
 
-    # If model output is not scalar, apply global spatial average pooling.
+    # If model output is not sca lar, apply globalspatial average pooling.
     # This happens if you choose a dimensionality not equal 2048.
     if pred.size(2) != 1 or pred.size(3) != 1:
         pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
@@ -183,23 +184,28 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
             np.trace(sigma2) - 2 * tr_covmean)
 
 
-def calculate_fretchet(images_real, images_fake, model):
+def calculate_frechet(images_real, images_fake, model):
     mu_1, std_1 = calculate_activation_statistics(images_real, model, cuda=False)
     mu_2, std_2 = calculate_activation_statistics(images_fake, model, cuda=False)
-
     """get fretched distance"""
     fid_value = calculate_frechet_distance(mu_1, std_1, mu_2, std_2)
     return fid_value
 
+
 if __name__ == '__main__':
+    import matplotlib.pyplot as plt
 
-
-    tensor_1 = torch.Tensor([[1,2,3],[1,2,5]])
+    a = np.load("/Users/francescodifeola/Desktop/downloads_alvis/window_training/weight_A.npy")
+    print(len(a))
+    plt.plot(range(0, len(a)), a)
+    plt.show()
+    tensor_1 = torch.Tensor([[1, 2, 3], [1, 2, 5]])
 
 
     def frobenious_dist(t1):
-        dot_prod = t1*t1
+        dot_prod = t1 * t1
         return torch.sqrt(torch.sum(dot_prod, dim=1))
+
 
     print(frobenious_dist(tensor_1))
 

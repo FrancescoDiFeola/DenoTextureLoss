@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import torch
@@ -12,17 +12,11 @@ def convert_string_to_floats(long_string_with_commas):
     return float_numbers
 
 
-def compute_wilcoxon_test(path_csv_1, index_1, index_2):
-    exp_1 = pd.read_csv(path_csv_1, header=None)
+def compute_wilcoxon_test(set_1, set_2):
 
+    set1 = np.array(set_1)
 
-    set1 = convert_string_to_floats(exp_1.iloc[index_1][1])
-    set2 = convert_string_to_floats(exp_1.iloc[index_2][1])
-
-    # difference between two set of metrics
-    set1 = np.array(set1)
-
-    set2 = np.array(set2)
+    set2 = np.array(set_2)
 
     d = np.squeeze(np.subtract(set1, set2))
     # To test the null hypothesis that there
@@ -70,9 +64,9 @@ def compute_results_2(path_csv_1, path_csv_2, path_csv_3, exp_name, index_csv):
     exp_2 = convert_string_to_floats(exp_2.iloc[index_csv][1])
     exp_3 = convert_string_to_floats(exp_3.iloc[index_csv][1])
 
-    print(len(exp_1))
-    print(len(exp_2))
-    print(len(exp_3))
+    # print(len(exp_1))
+    # print(len(exp_2))
+    # print(len(exp_3))
     average = [(im_1 + im_2 + im_3)/3 for im_1, im_2, im_3 in zip(exp_1, exp_2, exp_3)]
 
     std = [np.std([im_1, im_2, im_3]) for im_1, im_2, im_3 in zip(exp_1, exp_2, exp_3)]
@@ -83,23 +77,51 @@ def compute_results_2(path_csv_1, path_csv_2, path_csv_3, exp_name, index_csv):
         squared_sum += i*i
     overall_std = np.sqrt(squared_sum/len(std))
 
-    #  print(f'{exp_name}_1: {exp_1_average} +- {exp_1_std}')
+    # print(f'{exp_name}_1: {exp_1_average} +- {exp_1_std}')
     #  print(f'{exp_name}_2: {exp_2_average} +- {exp_2_std}')
     # print(f'{exp_name}_3: {exp_3_average} +- {exp_3_std}')
 
     print(f'{exp_name}_overall: {overall_average} +- {overall_std}')
     print("-----------------------------------------------------------")
+    return average
 
 
 if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    a = np.load("/Users/francescodifeola/Desktop/downloads_alvis/window_training/weight.npy")
+    print(a)
+    '''for i in range(0, 6, 1):
+        average_1 = compute_results_2(
+            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_perceptual_window_7/metrics_elcap_epoch200.csv',
+            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_perceptual_window_8/metrics_elcap_epoch200.csv',
+            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_perceptual_window_9/metrics_elcap_epoch200.csv',
+            'baseline',
+            4)
+
+        average_2 = compute_results_2(
+            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_4/metrics_elcap_epoch200.csv',
+            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_5/metrics_elcap_epoch200.csv',
+            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_6/metrics_elcap_epoch200.csv',
+            'baseline',
+            4)
+
+        compute_wilcoxon_test(average_1, average_2)'''
+
+    '''for i in range(5):
+        average = compute_results_2(
+            'checkpoints/check1/web/metrics/metrics_test_3_epoch200_perc_1.csv',
+            'checkpoints/check1/web/metrics/metrics_test_3_epoch200_perc_2.csv',
+            'checkpoints/check1/web/metrics/metrics_test_3_epoch200_perc_3.csv',
+            'baseline',
+            i)'''
+
     for i in range(6):
-        compute_results_2(
-            '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_baseline_nw_1/metrics_test_1_epoch200.csv',
-            '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_baseline_nw_2/metrics_test_1_epoch200.csv',
-            '/Users/francescodifeola/Desktop/downloads_alvis/metrics_pix2pix_baseline_nw_3/metrics_test_1_epoch200.csv',
+        average = compute_results_2(
+            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_7/metrics_test_1_epoch200.csv',
+            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_8//metrics_test_1_epoch200.csv',
+            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_9/metrics_test_1_epoch200.csv',
             'baseline',
             i)
-
 
     """
     print("Pix2Pix")

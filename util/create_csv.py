@@ -12,13 +12,23 @@ def create_annotation_file(path_folder, domain):
         'partial_path': [],
         'patient': [],
         'domain': [],
-        'tube_current': [],
-        'bit_stored': [],
-        'exposure_time': [],
-        'exposure': [],
-        'slice_thickness': [],
-        'protocol': [],
-        'tension': [],
+        'XRayTubeCurrent': [],
+        'BitsStored': [],
+        'ExposureTime': [],
+        'Exposure': [],
+        'SliceThickness': [],
+        'ProtocolName': [],
+        'KVP': [],
+        'ConvolutionKernel': [],
+        'BodyPartExamined': [],
+        'ScanOptions': [],
+        'ReconstructionDiameter': [],
+        'DistanceSourceToDetector': [],
+        'DistanceSourceToPatient': [],
+        'Manufacturer': [],
+        'Modality': [],
+        'ManufacturerModelName': [],
+        'PatientID': [],
     }
     patients_list = sorted(os.listdir(path_folder))
     if '.DS_Store' in patients_list:
@@ -36,37 +46,78 @@ def create_annotation_file(path_folder, domain):
             info['patient'].append(t)
             info['domain'].append(domain)
             try:
-                info['tube_current'].append(dicom['XRayTubeCurrent'].value)
+                info['XRayTubeCurrent'].append(dicom['XRayTubeCurrent'].value)
             except KeyError:
-                info['tube_current'].append('-')
+                info['XRayTubeCurrent'].append('-')
             try:
-                info['bit_stored'].append(dicom['BitsStored'].value)
+                info['BitsStored'].append(dicom['BitsStored'].value)
             except KeyError:
-                info['bit_stored'].append('-')
+                info['BitsStored'].append('-')
             try:
-                info['exposure_time'].append(dicom['ExposureTime'].value)
+                info['ExposureTime'].append(dicom['ExposureTime'].value)
             except KeyError:
-                info['exposure_time'].append('-')
+                info['ExposureTime'].append('-')
             try:
-                info['exposure'].append(dicom['Exposure'].value)
+                info['Exposure'].append(dicom['Exposure'].value)
             except KeyError:
-                info['exposure'].append('-')
+                info['Exposure'].append('-')
             try:
-                info['slice_thickness'].append(dicom['SliceThickness'].value)
+                info['SliceThickness'].append(dicom['SliceThickness'].value)
             except KeyError:
-                info['slice_thickness'].append('-')
+                info['SliceThickness'].append('-')
             try:
-                info['protocol'].append(dicom['ProtocolName'].value)
+                info['ProtocolName'].append(dicom['ProtocolName'].value)
             except KeyError:
-                info['protocol'].append('-')
+                info['ProtocolName'].append('-')
             try:
-                info['tension'].append(dicom['KVP'].value)
+                info['KVP'].append(dicom['KVP'].value)
             except KeyError:
-                info['tension'].append('-')
+                info['KVP'].append('-')
+            try:
+                info['ConvolutionKernel'].append(dicom['ConvolutionKernel'].value)
+            except KeyError:
+                info['ConvolutionKernel'].append('-')
+            try:
+                info['BodyPartExamined'].append(dicom['BodyPartExamined'].value)
+            except KeyError:
+                info['BodyPartExamined'].append('-')
+            try:
+                info['ScanOptions'].append(dicom['ScanOptions'].value)
+            except KeyError:
+                info['ScanOptions'].append('-')
+            try:
+                info['ReconstructionDiameter'].append(dicom['ReconstructionDiameter'].value)
+            except KeyError:
+                info['ReconstructionDiameter'].append('-')
+            try:
+                info['DistanceSourceToDetector'].append(dicom['DistanceSourceToDetector'].value)
+            except KeyError:
+                info['DistanceSourceToDetector'].append('-')
+            try:
+                info['DistanceSourceToPatient'].append(dicom['DistanceSourceToPatient'].value)
+            except KeyError:
+                info['DistanceSourceToPatient'].append('-')
+            try:
+                info['Manufacturer'].append(dicom['Manufacturer'].value)
+            except KeyError:
+                info['Manufacturer'].append('-')
+            try:
+                info['Modality'].append(dicom['Modality'].value)
+            except KeyError:
+                info['Modality'].append('-')
+            try:
+                info['ManufacturerModelName'].append(dicom['ManufacturerModelName'].value)
+            except KeyError:
+                info['ManufacturerModelName'].append('-')
+            try:
+                info['PatientID'].append(dicom['PatientID'].value)
+            except KeyError:
+                info['PatientID'].append('-')
+
 
     return pd.DataFrame(info)
 
-
+# for LIDC/IDRI
 def create_annotation_file_2(path_folder):
     info = {
         'path_slice': [],
@@ -134,21 +185,21 @@ def create_annotation_file_2(path_folder):
 
 
 if __name__ == "__main__":
-    interim_dir = './data/'
-    df = create_annotation_file(
-        path_folder='CT_data/interim/test_LIDC',
+    interim_dir = '../data/'
+    df_ld = create_annotation_file(
+        path_folder='../CT_data/interim/ELCAP_LIDC-dataset/LDCT',
         domain='LD',
     )
-    '''df_hd = create_annotation_file(
-        path_folder='/Volumes/sandisk/LIDC_IDRI_unpaired_balanced/LDCT',
-        domain='LD',
-    )'''
+    df_hd = create_annotation_file(
+        path_folder='../CT_data/interim/ELCAP_LIDC-dataset/HDCT',
+        domain='HD',
+    )
 
     '''df = create_annotation_file_2(
          path_folder='/Volumes/UmuAILab-backup/manifest-1600709154662/LIDC-IDRI'
      )'''
 
-    # df = pd.concat([df_ld, df_hd], axis=0, ignore_index=True)
-    df.to_csv(os.path.join(interim_dir, 'LIDC_test.csv'))
+    df = pd.concat([df_ld, df_hd], axis=0, ignore_index=True)
+    df.to_csv(os.path.join(interim_dir, 'ELCAP_dataset.csv'))
 
     print('May be the force with you.')

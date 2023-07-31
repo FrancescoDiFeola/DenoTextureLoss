@@ -1,10 +1,11 @@
 import os
-from util.util import empty_dictionary
+from util.util import empty_dictionary, tensor2im2
 import numpy as np
 import torch
 from collections import OrderedDict
 from abc import ABC, abstractmethod
 from . import networks
+
 
 
 class BaseModel(ABC):
@@ -96,7 +97,7 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    def test(self):
+    def test(self, idx):
         """run the model in inference mode.
         """
         pass
@@ -124,7 +125,6 @@ class BaseModel(ABC):
             self.load_networks(load_suffix)
         self.print_networks(opt.verbose)
 
-    # modified
     def setup1(self, opt):
         """Load and print networks; create schedulers
 
@@ -134,7 +134,7 @@ class BaseModel(ABC):
         if self.isTrain:
             self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
         if not self.isTrain or opt.continue_train:
-            self.load_networks_1(opt.epoch)
+            self.load_networks_1(opt.epoch, opt.experiment_name)
         self.print_networks(opt.verbose)
 
     def eval(self):
@@ -193,18 +193,6 @@ class BaseModel(ABC):
 
     ######
 
-    def test(self):
-        """Forward function used in test time.
-
-        This function wraps <forward> function in no_grad() so we don't save intermediate steps for backprop
-        It also calls <compute_visuals> to produce additional visualization results
-        """
-        pass
-        """
-        with torch.no_grad():
-            self.forward()
-            self.compute_visuals()
-        """
 
     def compute_visuals(self):
         """Calculate additional output images for visdom and HTML visualization"""
@@ -326,8 +314,7 @@ class BaseModel(ABC):
                     self.__patch_instance_norm_state_dict(state_dict, net, key.split('.'))
                 net.load_state_dict(state_dict)
 
-    # modified
-    def load_networks_1(self, epoch):
+    def load_networks_1(self, epoch, exp):
         """Load all the networks from the disk.
 
         Parameters:
@@ -335,7 +322,7 @@ class BaseModel(ABC):
         """
         for name in self.model_names:
             if isinstance(name, str):
-                load_filename = '%s_net_%s.pth' % (epoch, name)
+                load_filename = '%s_net_%s_%s.pth' % (epoch, name, exp)
                 load_path = os.path.join(self.save_dir, load_filename)
                 net = getattr(self, 'net' + name)
                 if isinstance(net, torch.nn.DataParallel):
@@ -351,15 +338,6 @@ class BaseModel(ABC):
                 for key in list(state_dict.keys()):  # need to copy keys here because we mutate in loop
                     self.__patch_instance_norm_state_dict(state_dict, net, key.split('.'))
                 net.load_state_dict(state_dict)
-
-        '''print('loading the model from %s' % load_path)
-        # if you are using PyTorch newer than 0.4 (e.g., built from
-        # GitHub source), you can remove str() on self.device
-        state_dict = torch.load(load_path, map_location=str(self.device))
-        print(state_dict)
-        if hasattr(state_dict, '_metadata'):
-            del state_dict._metadata'''
-
 
     def print_networks(self, verbose):
         """Print the total number of parameters in the network and (if verbose) network architecture
