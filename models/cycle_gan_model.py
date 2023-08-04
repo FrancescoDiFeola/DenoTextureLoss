@@ -1,6 +1,6 @@
 import itertools
 
-import numpy as np
+import torch
 
 from util.image_pool import ImagePool
 from util.util import *
@@ -15,7 +15,7 @@ from loss_functions.perceptual_loss import perceptual_similarity_loss
 from loss_functions.texture_loss import texture_loss
 from metrics.mse_psnr_ssim_vif import mean_squared_error, peak_signal_to_noise_ratio, structural_similarity_index, vif
 from models.networks import init_net
-
+from piq import brisque
 
 class CycleGANModel(BaseModel):
     """
@@ -48,10 +48,10 @@ class CycleGANModel(BaseModel):
         """
         parser.set_defaults(no_dropout=True)  # default CycleGAN did not use dropout
         parser.add_argument('--experiment_name', type=str, default="default", help='experiment name')
-        parser.add_argument('--image_folder', type=str, default="images", help='folder to save images during training')
-        parser.add_argument('--metric_folder', type=str, default="metrics", help='folder to save metrics')
-        parser.add_argument('--loss_folder', type=str, default="losses", help='folder to save losses')
-        parser.add_argument('--test_folder', type=str, default="test", help='folder to save test images')
+        parser.add_argument('--image_folder', type=str, default=None, help='folder to save images during training')
+        parser.add_argument('--metric_folder', type=str, default=None, help='folder to save metrics')
+        parser.add_argument('--loss_folder', type=str, default=None, help='folder to save losses')
+        parser.add_argument('--test_folder', type=str, default=None, help='folder to save test images')
         parser.add_argument('--test', type=str, default="test_1", help='folder to save test images')
         if is_train:
             parser.add_argument('--lambda_A', type=float, default=10.0, help='weight for cycle loss (A -> B -> A)')
@@ -83,11 +83,9 @@ class CycleGANModel(BaseModel):
         # specify the training losses you want to print out. The training/test scripts will call
         # <BaseModel.get_current_losses>
         if opt.experiment_name.find('texture') != -1:
-            self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'cycle_texture_A', 'D_B', 'G_B', 'cycle_B', 'idt_B',
-                               'cycle_texture_B']
+            self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'cycle_texture_A', 'D_B', 'G_B', 'cycle_B', 'idt_B', 'cycle_texture_B']
         elif opt.experiment_name.find('perceptual') != -1:
-            self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'perceptual_A', 'D_B', 'G_B', 'cycle_B', 'idt_B',
-                               'perceptual_B']
+            self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'perceptual_A', 'D_B', 'G_B', 'cycle_B', 'idt_B', 'perceptual_B']
         elif opt.experiment_name.find('baseline') != -1:
             self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'D_B', 'G_B', 'cycle_B', 'idt_B']
 
@@ -109,7 +107,7 @@ class CycleGANModel(BaseModel):
         #####
         self.test_visual_names = ['real_A', 'fake_B', 'real_B']
 
-        self.metric_names = ['psnr', 'mse', 'ssim', 'vif', 'NIQE', 'FID']
+        self.metric_names = ['psnr', 'mse', 'ssim', 'vif', 'NIQE', 'FID', 'brisque']
         self.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web')
         self.loss_dir = os.path.join(self.web_dir, f'{opt.loss_folder}')
 
@@ -133,14 +131,17 @@ class CycleGANModel(BaseModel):
             self.avg_metrics_test_3[key]['mean'] = list()
             self.avg_metrics_test_3[key]['std'] = list()
 
-        block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
-        self.inception_model = InceptionV3([block_idx])
+        # block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
+        # self.inception_model = InceptionV3([block_idx])
         # self.clip_net = load_feature_network(network_name='inception_v3_tf')
         #  print(self.clip_net)
 
-        self.real_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
-        self.fake_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
+        # self.real_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
+        # self.fake_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
+        self.real_test_buffer = []
+        self.fake_test_buffer = []
 
+        # NIQE metric
         self.niqe = pyiqa.create_metric('niqe', device=torch.device('cpu'), as_loss=False)
 
         # #### specify the models you want to save to the disk. The training/test scripts will call
@@ -168,6 +169,7 @@ class CycleGANModel(BaseModel):
                 assert (opt.input_nc == opt.output_nc)
             self.fake_A_pool = ImagePool(opt.pool_size)  # create image buffer to store previously generated images
             self.fake_B_pool = ImagePool(opt.pool_size)  # create image buffer to store previously generated images
+
             # define loss_functions
             self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)  # define GAN loss.
             self.criterionCycle = torch.nn.L1Loss()
@@ -178,15 +180,17 @@ class CycleGANModel(BaseModel):
             if opt.texture_criterion == 'attention':
                 self.attention = init_net(Self_Attn(1, 'relu'))
 
-                # self.optimizer_att = torch.optim.Adam(self.attention.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
                 self.weight_A = list()
                 self.weight_B = list()
                 self.attention_A = list()
                 self.attention_B = list()
 
-            self.optimizer_G = torch.optim.Adam(
-                itertools.chain(self.netG_A.parameters(), self.netG_B.parameters(), self.attention.parameters()),
-                lr=opt.lr, betas=(opt.beta1, 0.999))
+                self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG_A.parameters(), self.netG_B.parameters(), self.attention.parameters()),
+                                                    lr=opt.lr, betas=(opt.beta1, 0.999))
+            else:
+                self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()),
+                                                    lr=opt.lr, betas=(opt.beta1, 0.999))
+
             self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD_A.parameters(), self.netD_B.parameters()),
                                                 lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizers.append(self.optimizer_G)
@@ -227,23 +231,33 @@ class CycleGANModel(BaseModel):
 
     def test(self, idx):
         with torch.no_grad():
-            self.real_test_buffer = torch.cat([self.real_test_buffer, ((self.real_B + 1) * 0.5).expand(-1, 3, -1, -1)],
-                                              dim=0)
             self.fake_B = self.netG_A(self.real_A)
-            self.fake_test_buffer = torch.cat([self.fake_test_buffer, ((self.fake_B + 1) * 0.5).expand(-1, 3, -1, -1)],
-                                              dim=0)
-            self.compute_metrics(idx)
-            self.track_metrics()
+            self.fake_test_buffer.append(self.fake_B)
+            self.real_test_buffer.append(self.real_B)
+            # self.compute_metrics(idx)
+            # self.track_metrics()
 
     def compute_metrics(self, idx):
-        if self.opt.test == 'test_3' or self.opt.test == 'elcap':
+        if self.opt.dataset_mode == "LIDC_IDRI":
             # NIQE
             fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
             self.NIQE = self.niqe(fake_B_3channels).item()
+            self.brisque = 0
             self.mse = 0
             self.psnr = 0
             self.ssim = 0
             self.vif = 0
+        elif self.opt.test == "elcap_complete":
+            # NIQE
+            fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
+            self.NIQE = self.niqe(fake_B_3channels).item()
+            self.brisque = 0
+            self.mse = 0
+            self.psnr = 0
+            self.ssim = 0
+            self.vif = 0
+            # FID
+            # self.compute_fid(idx)
         else:
             x = tensor2im2(self.real_B)
             y = tensor2im2(self.fake_B)
@@ -256,17 +270,21 @@ class CycleGANModel(BaseModel):
             # NIQE
             fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
             self.NIQE = self.niqe(fake_B_3channels).item()
+
+            self.brisque = brisque(((self.fake_B + 1) * 0.5).expand(-1, 1, -1, -1)).item()
             # VIF
             self.vif = vif(x, y)
             # FID
-            self.compute_fid(idx)
+            # self.compute_fid(idx)
 
     def compute_fid(self, idx):
+        '''
         if idx == self.opt.dataset_len - 1:
-            fid_index = calculate_frechet(self.real_test_buffer, self.fake_test_buffer, self.inception_model)
-            self.metrics_eval['FID'].append(fid_index)
+            # fid_index = calculate_frechet(self.real_test_buffer, self.fake_test_buffer, self.inception_model)
+            # self.metrics_eval['FID'].append(fid_index)
         else:
-            pass
+            pass'''
+        pass
 
     def backward_D_basic(self, netD, real, fake):
         """Calculate GAN loss for the discriminator
@@ -341,7 +359,7 @@ class CycleGANModel(BaseModel):
                                                                                   self.criterionTexture, self.opt)
 
                 # save the index of the maximum texture descriptor for each image in the batch
-                for i in range(2):
+                for i in range(self.opt.batch_size):
                     self.index_texture_A.append(torch.nonzero(delta_grids_A == criterion_texture_A[i]).squeeze())
                     self.index_texture_B.append(torch.nonzero(delta_grids_B == criterion_texture_B[i]).squeeze())
 
@@ -368,6 +386,7 @@ class CycleGANModel(BaseModel):
             self.loss_cycle_texture_A = 0
             self.loss_cycle_texture_B = 0
 
+        # Perceptual loss
         lambda_perceptual = self.opt.lambda_perceptual
         if lambda_perceptual > 0:
             loss_perceptual_A = perceptual_similarity_loss(self.rec_A, self.real_A, self.vgg,
@@ -401,14 +420,8 @@ class CycleGANModel(BaseModel):
         self.set_requires_grad([self.netD_A, self.netD_B], False)  # Ds require no gradients when optimizing Gs
         self.optimizer_G.zero_grad()  # set G_A and G_B's gradients to zero
 
-        '''if self.opt.texture_criterion == "attention":
-            self.optimizer_att.zero_grad()'''
-
         self.backward_G()  # calculate gradients for G_A and G_B
         self.optimizer_G.step()  # update G_A and G_B's weights
-
-        '''if self.opt.texture_criterion == "attention":
-            self.optimizer_att.step()'''
 
         # D_A and D_B
         self.set_requires_grad([self.netD_A, self.netD_B], True)
@@ -428,3 +441,9 @@ class CycleGANModel(BaseModel):
     def save_attention_weights(self):
         np.save(f"{self.loss_dir}/weight_A.npy", np.array(self.weight_A))
         np.save(f"{self.loss_dir}/weight_B.npy", np.array(self.weight_B))
+
+    def save_list_images(self):
+        real_buffer = torch.cat(self.real_test_buffer, dim=0)
+        fake_buffer = torch.cat(self.fake_test_buffer, dim=0)
+        torch.save(real_buffer, f'./real_buffer.pth')
+        torch.save(fake_buffer, f'./fake_buffer.pth')

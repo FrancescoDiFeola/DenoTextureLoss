@@ -185,21 +185,22 @@ def create_annotation_file_2(path_folder):
 
 
 if __name__ == "__main__":
-    interim_dir = '../data/'
+
+    interim_dir = './data/'
     df_ld = create_annotation_file(
-        path_folder='../CT_data/interim/ELCAP_LIDC-dataset/LDCT',
+        path_folder='./CT_data/interim/ELCAP',
         domain='LD',
     )
-    df_hd = create_annotation_file(
-        path_folder='../CT_data/interim/ELCAP_LIDC-dataset/HDCT',
+    '''df_hd = create_annotation_file(
+        path_folder='./CT_data/interim/ELCAP/HDCT',
         domain='HD',
-    )
+    )'''
 
     '''df = create_annotation_file_2(
          path_folder='/Volumes/UmuAILab-backup/manifest-1600709154662/LIDC-IDRI'
      )'''
 
-    df = pd.concat([df_ld, df_hd], axis=0, ignore_index=True)
-    df.to_csv(os.path.join(interim_dir, 'ELCAP_dataset.csv'))
+    # df = pd.concat([df_ld, df_hd], axis=0, ignore_index=True)
+    df_ld.to_csv(os.path.join(interim_dir, 'ELCAP.csv'))
 
     print('May be the force with you.')

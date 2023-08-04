@@ -93,15 +93,15 @@ class Visualizer():
         # if self.use_html:  # create an HTML object at <checkpoints_dir>/web/; images will be saved under
         # <checkpoints_dir>/web/images/
         self.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web')
-        # self.img_dir = os.path.join(self.web_dir, f'{opt.image_folder}')
-        # self.test_dir = os.path.join(self.web_dir, f'{opt.test_folder}')
+        self.img_dir = os.path.join(self.web_dir, f'{opt.image_folder}')
+        self.test_dir = os.path.join(self.web_dir, f'{opt.test_folder}')
         self.loss_dir = os.path.join(self.web_dir, f'{opt.loss_folder}')
         self.metric_dir = os.path.join(self.web_dir, f'{opt.metric_folder}')
         print('create web directory %s...' % self.web_dir)
-        # util.mkdirs([self.web_dir, self.img_dir])
-        util.mkdirs([self.web_dir, self.loss_dir])
-        # util.mkdirs([self.web_dir, self.test_dir])
-        util.mkdirs([self.web_dir, self.metric_dir])
+        util.mkdirs([self.web_dir, self.img_dir]) if (opt.image_folder is not None) else "pass"
+        util.mkdirs([self.web_dir, self.loss_dir]) if (opt.loss_folder is not None) else "pass"
+        util.mkdirs([self.web_dir, self.test_dir]) if (opt.test_folder is not None) else "pass"
+        util.mkdirs([self.web_dir, self.metric_dir]) if (opt.metric_folder is not None) else "pass"
         # create a logging file to store training losses
         self.log_name = os.path.join(opt.checkpoints_dir, opt.name, f'loss_log_{opt.experiment_name}.txt')
         with open(self.log_name, "a") as log_file:
@@ -257,7 +257,7 @@ class Visualizer():
         if self.use_wandb:
             self.wandb_run.log(current_losses)
 
-    def plot_metrics(self, tracked_metrics, epoch_performance, epoch, name_title, exp):
+    def plot_metrics(self, tracked_metrics, epoch_performance, epoch, name_title):
         """display the current losses on visdom display: dictionary of error labels and values
 
                Parameters:
@@ -267,10 +267,10 @@ class Visualizer():
                    tracked losses (OrderedDict) -- the whole losses history so far
                """
 
-        metric_path = os.path.join(self.metric_dir, f'metrics_{self.opt.test}_{exp}.png')
+        metric_path = os.path.join(self.metric_dir, f'metrics_{self.opt.test}.png')
         # util.save_plots(tracked_metrics, metric_path, name_title)  # save the plots to the disk
-        csv_path1 = os.path.join(self.metric_dir, f'metrics_{self.opt.test}_{exp}.csv')
-        csv_path2 = os.path.join(self.metric_dir, f'metrics_{self.opt.test}_epoch{epoch}_{exp}.csv')
+        csv_path1 = os.path.join(self.metric_dir, f'metrics_{self.opt.test}.csv')
+        csv_path2 = os.path.join(self.metric_dir, f'metrics_{self.opt.test}_epoch{epoch}.csv')
         util.save_ordered_dict_as_csv(tracked_metrics, csv_path1)
         if epoch == 1 or epoch == 200:
             util.save_ordered_dict_as_csv(epoch_performance, csv_path2)

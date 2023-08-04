@@ -13,7 +13,6 @@ def convert_string_to_floats(long_string_with_commas):
 
 
 def compute_wilcoxon_test(set_1, set_2):
-
     set1 = np.array(set_1)
 
     set2 = np.array(set_2)
@@ -38,7 +37,6 @@ def compute_results(path_csv_1, path_csv_2, path_csv_3, exp_name, index_csv):
     exp_1_average = np.mean(exp_1)
     exp_1_std = np.std(exp_1)
 
-
     exp_2_average = np.mean(exp_2)
     exp_2_std = np.std(exp_2)
 
@@ -46,7 +44,7 @@ def compute_results(path_csv_1, path_csv_2, path_csv_3, exp_name, index_csv):
     exp_3_std = np.std(exp_3)
 
     overall_average = (exp_1_average + exp_2_average + exp_2_average) / 3
-    overall_std = np.sqrt(((exp_1_std*exp_1_std)+(exp_2_std*exp_2_std)+(exp_3_std*exp_3_std))/3)
+    overall_std = np.sqrt(((exp_1_std * exp_1_std) + (exp_2_std * exp_2_std) + (exp_3_std * exp_3_std)) / 3)
 
     #  print(f'{exp_name}_1: {exp_1_average} +- {exp_1_std}')
     #  print(f'{exp_name}_2: {exp_2_average} +- {exp_2_std}')
@@ -55,73 +53,74 @@ def compute_results(path_csv_1, path_csv_2, path_csv_3, exp_name, index_csv):
     print(f'{exp_name}_overall: {overall_average} +- {overall_std}')
     print("-----------------------------------------------------------")
 
+
 def compute_results_2(path_csv_1, path_csv_2, path_csv_3, exp_name, index_csv):
-    exp_1 = pd.read_csv(path_csv_1, header=None)
+    # exp_1 = pd.read_csv(path_csv_1, header=None)
     exp_2 = pd.read_csv(path_csv_2, header=None)
     exp_3 = pd.read_csv(path_csv_3, header=None)
 
-    exp_1 = convert_string_to_floats(exp_1.iloc[index_csv][1])
+    # exp_1 = convert_string_to_floats(exp_1.iloc[index_csv][1])
     exp_2 = convert_string_to_floats(exp_2.iloc[index_csv][1])
     exp_3 = convert_string_to_floats(exp_3.iloc[index_csv][1])
 
     # print(len(exp_1))
     # print(len(exp_2))
     # print(len(exp_3))
-    average = [(im_1 + im_2 + im_3)/3 for im_1, im_2, im_3 in zip(exp_1, exp_2, exp_3)]
+    # average = [(im_1 + im_2 + im_3) / 3 for im_1, im_2, im_3 in zip(exp_1, exp_2, exp_3)]
+    average = [(im_2 + im_3) / 2 for im_2, im_3 in zip(exp_2, exp_3)]
 
-    std = [np.std([im_1, im_2, im_3]) for im_1, im_2, im_3 in zip(exp_1, exp_2, exp_3)]
+    # std = [np.std([im_1, im_2, im_3]) for im_1, im_2, im_3 in zip(exp_1, exp_2, exp_3)]
+    std = [np.std([im_2, im_3]) for im_2, im_3 in zip(exp_2, exp_3)]
 
     overall_average = np.mean(average)
     squared_sum = 0
     for i in std:
-        squared_sum += i*i
-    overall_std = np.sqrt(squared_sum/len(std))
+        squared_sum += i * i
+    overall_std = np.sqrt(squared_sum / len(std))
 
     # print(f'{exp_name}_1: {exp_1_average} +- {exp_1_std}')
     #  print(f'{exp_name}_2: {exp_2_average} +- {exp_2_std}')
     # print(f'{exp_name}_3: {exp_3_average} +- {exp_3_std}')
 
-    print(f'{exp_name}_overall: {overall_average} +- {overall_std}')
+    print(f'{overall_average} +- {overall_std}')
     print("-----------------------------------------------------------")
     return average
 
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-    a = np.load("/Users/francescodifeola/Desktop/downloads_alvis/window_training/weight.npy")
-    print(a)
-    '''for i in range(0, 6, 1):
-        average_1 = compute_results_2(
-            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_perceptual_window_7/metrics_elcap_epoch200.csv',
-            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_perceptual_window_8/metrics_elcap_epoch200.csv',
-            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_perceptual_window_9/metrics_elcap_epoch200.csv',
-            'baseline',
-            4)
 
-        average_2 = compute_results_2(
-            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_4/metrics_elcap_epoch200.csv',
-            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_5/metrics_elcap_epoch200.csv',
-            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_6/metrics_elcap_epoch200.csv',
-            'baseline',
-            4)
+    '''for i in range(0, 7, 1):
+        if i == 5:
+            pass
+        else:
+            average_1 = compute_results_2(
+                '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_pix2pix_texture_Frob_window_4/metrics_test_2_epoch50.csv',
+                '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_pix2pix_texture_Frob_window_5/metrics_test_2_epoch50.csv',
+                '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_pix2pix_texture_Frob_window_6/metrics_test_2_epoch50.csv',
+                'baseline',
+                i)
 
-        compute_wilcoxon_test(average_1, average_2)'''
+            average_2 = compute_results_2(
+                '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_pix2pix_baseline_window_4/metrics_test_3_epoch50.csv',
+                '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_pix2pix_baseline_window_5/metrics_test_3_epoch50.csv',
+                '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_pix2pix_baseline_window_6/metrics_test_3_epoch50.csv',
+                'baseline',
+                i)
 
-    '''for i in range(5):
-        average = compute_results_2(
-            'checkpoints/check1/web/metrics/metrics_test_3_epoch200_perc_1.csv',
-            'checkpoints/check1/web/metrics/metrics_test_3_epoch200_perc_2.csv',
-            'checkpoints/check1/web/metrics/metrics_test_3_epoch200_perc_3.csv',
-            'baseline',
-            i)'''
+            compute_wilcoxon_test(average_1, average_2)'''
 
-    for i in range(6):
-        average = compute_results_2(
-            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_7/metrics_test_1_epoch200.csv',
-            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_8//metrics_test_1_epoch200.csv',
-            '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_9/metrics_test_1_epoch200.csv',
-            'baseline',
-            i)
+
+    n = [4, 6]
+    for i in range(7):
+        if i == 5:
+            pass
+        else:
+            average = compute_results_2(
+                '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_10/metrics_test_2_epoch200.csv',
+                '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_12/metrics_test_2_epoch200.csv',
+                '/Users/francescodifeola/Desktop/downloads_alvis/window_training/metrics_texture_att_window_12/metrics_test_2_epoch200.csv',
+                'baseline',
+                i)
 
     """
     print("Pix2Pix")
@@ -239,7 +238,7 @@ if __name__ == '__main__':
         0)
     """
 
-    # Set the font size
+    '''# Set the font size
     font_size = 12
 
     # Create the figure and subplots
@@ -373,8 +372,7 @@ if __name__ == '__main__':
 
     # Display the plot
     plt.show()
-    plt.figure()
-
+    plt.figure()'''
 
     '''########################
 

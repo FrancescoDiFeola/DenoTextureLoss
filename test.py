@@ -45,13 +45,12 @@ try:
 except ImportError:
     print('Warning: wandb package cannot be found. The option "--use_wandb" will result in error.')
 
-
 if __name__ == '__main__':
     opt = TrainOptions().parse()  # get training options
     opt.isTrain = False
     opt.epoch = 200
     model = create_model(opt)  # create a model given opt.model and other options
-    model.setup(opt)  # regular setup: load and print networks; create schedulers
+    model.setup1(opt)  # regular setup: load and print networks; create schedulers
     visualizer = Visualizer(opt)  # create a visualizer that display/save images and plots
     # Test 3 (8 patient from LIDC/IDRI)
     opt.isTrain = False
@@ -68,6 +67,7 @@ if __name__ == '__main__':
         model.set_input(data_test)  # unpack data from data loader
         model.test(j)  # run inference
 
-    model.avg_performance()
-    visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), 200, f'Average Metrics on {opt.test}', 'baseline_windowing_7')
-    model.empty_dictionary()
+    model.save_list_images()
+    # model.avg_performance()
+    # visualizer.plot_metrics(model.get_avg_test_metrics(), model.get_epoch_performance(), 200, f'Average Metrics on {opt.test}')
+    # model.empty_dictionary()

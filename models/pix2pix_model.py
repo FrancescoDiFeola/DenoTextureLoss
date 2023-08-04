@@ -4,11 +4,6 @@ import os
 import itertools
 from .vgg import VGG
 from util.util import tensor2im2, save_list_to_csv
-import cv2
-from math import log10
-from skimage.metrics import structural_similarity
-from sewar.full_ref import vifp
-from surgeon_pytorch import Inspect
 import pyiqa
 from loss_functions.attention import Self_Attn
 from metrics.FID import *
@@ -16,6 +11,8 @@ from metrics.mse_psnr_ssim_vif import mean_squared_error, peak_signal_to_noise_r
 from loss_functions.texture_loss import texture_loss
 from loss_functions.perceptual_loss import perceptual_similarity_loss
 from models.networks import init_net
+from piq import brisque
+
 
 class Pix2PixModel(BaseModel):
     """ This class implements the pix2pix model, for learning a mapping from input images to output images given paired data.
@@ -45,16 +42,15 @@ class Pix2PixModel(BaseModel):
         """
         # changing the default values to match the pix2pix paper (https://phillipi.github.io/pix2pix/)
         parser.set_defaults(norm='batch', netG='unet_256', dataset_mode='aligned')
+        parser.add_argument('--experiment_name', type=str, default="default", help='experiment name')
+        parser.add_argument('--image_folder', type=str, default=None, help='folder to save images during training')
+        parser.add_argument('--metric_folder', type=str, default=None, help='folder to save metrics')
+        parser.add_argument('--loss_folder', type=str, default=None, help='folder to save losses')
+        parser.add_argument('--test_folder', type=str, default=None, help='folder to save test images')
         if is_train:
             parser.set_defaults(pool_size=0, gan_mode='vanilla')
             parser.add_argument('--lambda_L1', type=float, default=100.0, help='weight for L1 loss')
             parser.set_defaults(no_dropout=True)  # default CycleGAN did not use dropout
-            parser.add_argument('--experiment_name', type=str, default="default", help='experiment name')
-            parser.add_argument('--image_folder', type=str, default="images",
-                                help='folder to save images during training')
-            parser.add_argument('--metric_folder', type=str, default="metrics", help='folder to save metrics')
-            parser.add_argument('--loss_folder', type=str, default="losses", help='folder to save losses')
-            parser.add_argument('--test_folder', type=str, default="test", help='folder to save test images')
             parser.add_argument('--lambda_A', type=float, default=10.0, help='weight for cycle loss (A -> B -> A)')
             parser.add_argument('--lambda_B', type=float, default=10.0, help='weight for cycle loss (B -> A -> B)')
             parser.add_argument('--lambda_identity', type=float, default=0.5,
@@ -91,7 +87,7 @@ class Pix2PixModel(BaseModel):
             self.error_store[key] = list()
 
         self.test_visual_names = ['real_A', 'fake_B', 'real_B']
-        self.metric_names = ['psnr', 'mse', 'ssim', 'vif', 'NIQE', 'FID']
+        self.metric_names = ['psnr', 'mse', 'ssim', 'vif', 'NIQE', 'FID', 'brisque']
         self.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web')
         self.loss_dir = os.path.join(self.web_dir, f'{opt.loss_folder}')
 
@@ -116,12 +112,13 @@ class Pix2PixModel(BaseModel):
             self.avg_metrics_test_3[key]['std'] = list()
 
         # self.fid = FrechetInceptionDistance(feature=64, normalize=True)
-        block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
-        self.inception_model = InceptionV3([block_idx])
+        # block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
+        # self.inception_model = InceptionV3([block_idx])
 
-        self.real_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
-        self.fake_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
+        # self.real_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
+        # self.fake_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
 
+        # NIQE metric
         self.niqe = pyiqa.create_metric('niqe', device=torch.device('cpu'), as_loss=False)
 
         if self.isTrain:
@@ -145,9 +142,12 @@ class Pix2PixModel(BaseModel):
                 self.attention = init_net(Self_Attn(1, 'relu'))
                 self.weight = list()
                 self.attention_B = list()
-            # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
-            self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG.parameters(), self.attention.parameters()), lr=opt.lr,
-                                                betas=(opt.beta1, 0.999))
+                # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
+                self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG.parameters(), self.attention.parameters()), lr=opt.lr,
+                                                    betas=(opt.beta1, 0.999))
+            else:
+                self.optimizer_G = torch.optim.Adam(self.netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+
             self.optimizer_D = torch.optim.Adam(self.netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
@@ -185,23 +185,31 @@ class Pix2PixModel(BaseModel):
     def test(self, idx):
 
         with torch.no_grad():
-            self.real_test_buffer = torch.cat([self.real_test_buffer, ((self.real_B + 1) * 0.5).expand(-1, 3, -1, -1)],
-                                              dim=0)
             self.fake_B = self.netG(self.real_A)
-            self.fake_test_buffer = torch.cat([self.fake_test_buffer, ((self.fake_B + 1) * 0.5).expand(-1, 3, -1, -1)],
-                                              dim=0)
             self.compute_metrics(idx)
             self.track_metrics()
 
     def compute_metrics(self, idx):
-        if self.opt.test == 'test_3' or self.opt.test == 'elcap':
+        if self.opt.dataset_mode == "LIDC_IDRI":
             # NIQE
             fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
             self.NIQE = self.niqe(fake_B_3channels).item()
+            self.brisque = 0
             self.mse = 0
             self.psnr = 0
             self.ssim = 0
             self.vif = 0
+        elif self.opt.test == "elcap_complete":
+            # NIQE
+            fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
+            self.NIQE = self.niqe(fake_B_3channels).item()
+            self.brisque = 0
+            self.mse = 0
+            self.psnr = 0
+            self.ssim = 0
+            self.vif = 0
+            # FID
+            # self.compute_fid(idx)
         else:
             x = tensor2im2(self.real_B)
             y = tensor2im2(self.fake_B)
@@ -214,17 +222,19 @@ class Pix2PixModel(BaseModel):
             # NIQE
             fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
             self.NIQE = self.niqe(fake_B_3channels).item()
+
+            self.brisque = brisque(((self.fake_B + 1) * 0.5).expand(-1, 1, -1, -1)).item()
             # VIF
             self.vif = vif(x, y)
             # FID
-            self.compute_fid(idx)
+            # self.compute_fid(idx)
 
     def compute_fid(self, idx):
-        if idx == self.opt.dataset_len - 1:
-            fid_index = calculate_frechet(self.real_test_buffer, self.fake_test_buffer, self.inception_model)
-            self.metrics_eval['FID'].append(fid_index)
-        else:
-            pass
+        """if idx == self.opt.dataset_len - 1:
+        fid_index = calculate_frechet(self.real_test_buffer, self.fake_test_buffer, self.inception_model)
+        self.metrics_eval['FID'].append(fid_index)
+        else:"""
+        pass
 
     def backward_D(self):
         """Calculate GAN loss for the discriminator"""
@@ -247,8 +257,8 @@ class Pix2PixModel(BaseModel):
         fake_AB = torch.cat((self.real_A, self.fake_B), 1)
         pred_fake = self.netD(fake_AB)
 
-        lambda_texture = self.opt.lambda_texture
         # Texture loss
+        lambda_texture = self.opt.lambda_texture
         if lambda_texture > 0:
 
             if self.opt.texture_criterion == 'attention':
@@ -264,7 +274,7 @@ class Pix2PixModel(BaseModel):
                                                                                 self.criterionTexture, self.opt)
 
                 # save the index of the maximum texture descriptor for each image in the batch
-                for i in range(2):
+                for i in range(self.opt.batch_size):
                     self.index_texture.append(torch.nonzero(delta_grids_B == criterion_texture_B[i]).squeeze())
 
                 # compute the loss function by averaging over the batch
@@ -284,6 +294,7 @@ class Pix2PixModel(BaseModel):
         else:
             self.loss_texture = 0
 
+        # Perceptual loss
         lambda_perceptual = self.opt.lambda_perceptual
         if lambda_perceptual > 0:
             loss_perceptual = perceptual_similarity_loss(self.fake_B, self.real_B, self.vgg, self.opt.perceptual_layers)
@@ -319,5 +330,3 @@ class Pix2PixModel(BaseModel):
 
     def save_attention_weights(self):
         np.save(f"{self.loss_dir}/weight.npy", np.array(self.weight))
-
-

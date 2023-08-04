@@ -1,10 +1,16 @@
+from torchvision.models import inception_v3
+import pickle
+import scipy.linalg
 import torch
 import torchvision.models as models
 import torch.nn.functional as F
 import torch.nn as nn
 import numpy as np
-from torch.nn.functional import adaptive_avg_pool2d
-from scipy import linalg
+from tqdm import tqdm
+
+def list_iterator(data, batch_size):
+    for i in range(0, len(data), batch_size):
+        yield data[i:i + batch_size]  # When a function contains the yield keyword, it becomes a generator function.
 
 
 class InceptionV3(nn.Module):
@@ -26,7 +32,8 @@ class InceptionV3(nn.Module):
                  output_blocks=[DEFAULT_BLOCK_INDEX],
                  resize_input=True,
                  normalize_input=False,
-                 requires_grad=False):
+                 requires_grad=False,
+                 device="cpu"):
 
         super(InceptionV3, self).__init__()
 
@@ -40,7 +47,7 @@ class InceptionV3(nn.Module):
 
         self.blocks = nn.ModuleList()
 
-        inception = models.inception_v3(pretrained=True)
+        inception = models.inception_v3(pretrained=True).to(device)
 
         # Block 0: input to maxpool1
         block0 = [
@@ -122,100 +129,174 @@ class InceptionV3(nn.Module):
         return outp
 
 
-def calculate_activation_statistics(images, model, batch_size=128, dims=2048, cuda=False):
-    model.eval()
-    act = np.empty((len(images), dims))
+class WrapperInceptionV3(nn.Module):
 
-    if cuda:
-        batch = images.cuda()
-    else:
-        batch = images
-    pred = model(batch)[0]
+    def __init__(self, fid_incv3):
+        super().__init__()
+        self.fid_incv3 = fid_incv3
 
-    # If model output is not sca lar, apply globalspatial average pooling.
-    # This happens if you choose a dimensionality not equal 2048.
-    if pred.size(2) != 1 or pred.size(3) != 1:
-        pred = adaptive_avg_pool2d(pred, output_size=(1, 1))
+    def prepare_img(self, img, standardize=False):
+        # Rescale in range [0 1]
+        img = (img + 1) / 2
+        img = img.clamp(0, 1)
+        # Make tree channel.
+        if img.shape[1] == 1:
+            img = img.repeat([1, 3, 1, 1])  # make a three channel tensor
+        # Normalize
+        if standardize:
+            img = (img - self.mean) / self.std  # Normalize img
 
-    act = pred.cpu().data.numpy().reshape(pred.size(0), -1)
+        return img
 
-    mu = np.mean(act, axis=0)
-    sigma = np.cov(act, rowvar=False)
-    return mu, sigma
-
-
-def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
-    """Numpy implementation of the Frechet Distance.
-    The Frechet distance between two multivariate Gaussians X_1 ~ N(mu_1, C_1)
-    and X_2 ~ N(mu_2, C_2) is
-            d^2 = ||mu_1 - mu_2||^2 + Tr(C_1 + C_2 - 2*sqrt(C_1*C_2)).
-    """
-
-    mu1 = np.atleast_1d(mu1)  # Convert inputs to arrays with at least one dimension.
-    mu2 = np.atleast_1d(mu2)
-
-    sigma1 = np.atleast_2d(sigma1)  # View inputs as arrays with at least two dimensions.
-    sigma2 = np.atleast_2d(sigma2)
-
-    assert mu1.shape == mu2.shape, \
-        'Training and test mean vectors have different lengths'
-    assert sigma1.shape == sigma2.shape, \
-        'Training and test covariances have different dimensions'
-
-    diff = mu1 - mu2
-
-    covmean, _ = linalg.sqrtm(sigma1.dot(sigma2), disp=False)
-    if not np.isfinite(covmean).all():
-        msg = ('fid calculation produces singular product; '
-               'adding %s to diagonal of cov estimates') % eps
-        print(msg)
-        offset = np.eye(sigma1.shape[0]) * eps
-        covmean = linalg.sqrtm((sigma1 + offset).dot(sigma2 + offset))
-
-    if np.iscomplexobj(covmean):
-        if not np.allclose(np.diagonal(covmean).imag, 0, atol=1e-3):
-            m = np.max(np.abs(covmean.imag))
-            raise ValueError('Imaginary component {}'.format(m))
-        covmean = covmean.real
-
-    tr_covmean = np.trace(covmean)
-
-    return (diff.dot(diff) + np.trace(sigma1) +
-            np.trace(sigma2) - 2 * tr_covmean)
+    @torch.no_grad()
+    def forward(self, x):
+        x = self.prepare_img(x)
+        y = self.fid_incv3(x)
+        y = y[0]
+        y = y[:, :, 0, 0]
+        return y
 
 
-def calculate_frechet(images_real, images_fake, model):
-    mu_1, std_1 = calculate_activation_statistics(images_real, model, cuda=False)
-    mu_2, std_2 = calculate_activation_statistics(images_fake, model, cuda=False)
-    """get fretched distance"""
-    fid_value = calculate_frechet_distance(mu_1, std_1, mu_2, std_2)
-    return fid_value
+# ----------------------------------------------------------------------------
+
+class FeatureStats:
+    def __init__(self, capture_all=False, capture_mean_cov=False, max_items=None):
+        self.capture_all = capture_all
+        self.capture_mean_cov = capture_mean_cov
+        self.max_items = max_items
+        self.num_items = 0
+        self.num_features = None
+        self.all_features = None
+        self.raw_mean = None
+        self.raw_cov = None
+
+    def set_num_features(self, num_features):
+        if self.num_features is not None:
+            assert num_features == self.num_features
+        else:
+            self.num_features = num_features
+            self.all_features = []
+            self.raw_mean = np.zeros([num_features], dtype=np.float64)
+            self.raw_cov = np.zeros([num_features, num_features], dtype=np.float64)
+
+    def is_full(self):
+        return (self.max_items is not None) and (self.num_items >= self.max_items)
+
+    def append(self, x):
+        x = np.asarray(x, dtype=np.float32)
+        assert x.ndim == 2
+        if (self.max_items is not None) and (self.num_items + x.shape[0] > self.max_items):
+            if self.num_items >= self.max_items:
+                return
+            x = x[:self.max_items - self.num_items]
+
+        self.set_num_features(x.shape[1])
+        self.num_items += x.shape[0]
+        if self.capture_all:
+            self.all_features.append(x)
+        if self.capture_mean_cov:
+            x64 = x.astype(np.float64)
+            self.raw_mean += x64.sum(axis=0)
+            self.raw_cov += x64.T @ x64  # @ applies matrix multiplication.
+
+    def append_torch(self, x):
+        assert isinstance(x, torch.Tensor) and x.ndim == 2
+        self.append(x.cpu().numpy())
+
+    def get_all(self):
+        assert self.capture_all
+        return np.concatenate(self.all_features, axis=0)
+
+    def get_all_torch(self):
+        return torch.from_numpy(self.get_all())
+
+    def get_mean_cov(self):
+        assert self.capture_mean_cov
+        mean = self.raw_mean / self.num_items
+        cov = self.raw_cov / self.num_items
+        cov = cov - np.outer(mean, mean)
+        return mean, cov
+
+    def save(self, pkl_file):
+        with open(pkl_file, 'wb') as f:
+            pickle.dump(self.__dict__, f)
+
+    @staticmethod
+    def load(pkl_file):
+        with open(pkl_file, 'rb') as f:
+            s = pickle.load(f)
+        obj = FeatureStats(capture_all=s['capture_all'], max_items=s['max_items'])
+        obj.__dict__.update(s)
+        return obj
+
+
+# ----------------------------------------------------------------------------
+
+class GANMetrics:
+
+    def __init__(self, device, detector_name='inceptionv3', batch_size=64):
+
+        self.device = device
+        self.detector_name = detector_name
+        self.batch_size = batch_size
+
+        if self.detector_name == 'inceptionv3':
+            dims = 2048
+            block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
+            model = InceptionV3([block_idx]).to(self.device)
+
+            # wrapper model to pytorch_fid model
+            wrapper_model = WrapperInceptionV3(model)
+            self.detector = wrapper_model.eval()
+        else:
+            raise NotImplementedError
+
+    def compute_feature(self, imgs, max_items, **stats_kwargs):
+
+        # Initialize.
+        stats = FeatureStats(max_items=max_items, **stats_kwargs)
+        assert stats.max_items is not None
+
+        imgs_iterator = list_iterator(imgs, self.batch_size)
+
+        # Main loop.
+        for img in imgs_iterator:
+            img = img.to(self.device)
+            feat = self.detector(img)
+            stats.append_torch(feat)
+
+        return stats
+
+    def compute_fid(self, imgs0, imgs1, n_samples):
+        """
+        Frechet Inception Distance (FID) from the paper
+        "GANs trained by a two time-scale update rule converge to a local Nash
+        equilibrium". Matches the original implementation by Heusel et al. at
+        https://github.com/bioinf-jku/TTUR/blob/master/fid.py
+        """
+
+        stats0 = self.compute_feature(
+            imgs=imgs0, max_items=n_samples, capture_mean_cov=True
+        )
+        mu0, sigma0 = stats0.get_mean_cov()
+
+        stats1 = self.compute_feature(
+            imgs=imgs1, max_items=n_samples, capture_mean_cov=True
+        )
+
+        mu1, sigma1 = stats1.get_mean_cov()
+
+        m = np.square(mu1 - mu0).sum()
+        s, _ = scipy.linalg.sqrtm(np.dot(sigma1, sigma0), disp=False)  # pylint: disable=no-member
+        fid = np.real(m + np.trace(sigma1 + sigma0 - s * 2))
+
+        return float(fid)
 
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
 
-    a = np.load("/Users/francescodifeola/Desktop/downloads_alvis/window_training/weight_A.npy")
-    print(len(a))
-    plt.plot(range(0, len(a)), a)
-    plt.show()
-    tensor_1 = torch.Tensor([[1, 2, 3], [1, 2, 5]])
-
-
-    def frobenious_dist(t1):
-        dot_prod = t1 * t1
-        return torch.sqrt(torch.sum(dot_prod, dim=1))
-
-
-    print(frobenious_dist(tensor_1))
-
-    '''block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[64]
-    model = InceptionV3([block_idx])
-
-
-    real_test_1_buffer = torch.rand((560, 3, 256, 256))
-    print(type(real_test_1_buffer))
-    fake_test_1_buffer = torch.ones((560, 3, 256, 256))
-    fid = calculate_fretchet(real_test_1_buffer, fake_test_1_buffer, model)
+    fake_buffer = torch.load('./fake_buffer.pth')
+    real_buffer = torch.load('./real_buffer.pth')
+    metric_obj = GANMetrics('cpu', detector_name='inceptionv3', batch_size=64)
+    fid = metric_obj.compute_fid(fake_buffer, real_buffer, 560)
     print(fid)
-    # model = model.cuda()'''
