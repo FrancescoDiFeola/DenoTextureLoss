@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 from torchvision.models import inception_v3
 import pickle
 import scipy.linalg
@@ -7,9 +8,10 @@ import torch.nn.functional as F
 import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
+from util.util import save_ordered_dict_as_csv
 
 def list_iterator(data, batch_size):
-    for i in range(0, len(data), batch_size):
+    for i in tqdm(range(0, len(data), batch_size)):
         yield data[i:i + batch_size]  # When a function contains the yield keyword, it becomes a generator function.
 
 
@@ -294,9 +296,24 @@ class GANMetrics:
 
 
 if __name__ == '__main__':
+    weight = np.load("/Users/francescodifeola/Desktop/pix2pix_results/losses_ep50/loss_pix2pix_texture_att_window_13/weight.npy")
+    plt.plot(range(0,16800), weight)
+    plt.show()
+    print(weight.shape)
 
-    fake_buffer = torch.load('./fake_buffer.pth')
-    real_buffer = torch.load('./real_buffer.pth')
+    fake_buffer = torch.load('/Volumes/Untitled/test_pix2pix_perceptual_window_5/fake_buffer_test_1_epoch50.pth', map_location=torch.device('cpu'))
+    real_buffer = torch.load('/Volumes/Untitled/test_pix2pix_perceptual_window_5/real_buffer_test_1_epoch50.pth',  map_location=torch.device('cpu'))
+    print(fake_buffer.shape)
+    print(real_buffer.shape)
+
+    '''for i in range(5):
+        plt.imshow(real_buffer[i, 0, :, :], cmap='gray')
+        plt.show()
+        plt.imshow(fake_buffer[i, 0, :, :], cmap='gray')
+        plt.show()'''
+
     metric_obj = GANMetrics('cpu', detector_name='inceptionv3', batch_size=64)
     fid = metric_obj.compute_fid(fake_buffer, real_buffer, 560)
-    print(fid)
+    fid = {'fid': fid}
+    save_ordered_dict_as_csv(fid, "/Volumes/Untitled/test_pix2pix_perceptual_window_5/fid_test_1.csv")
+

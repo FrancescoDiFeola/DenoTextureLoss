@@ -37,11 +37,10 @@ from options.train_options import TrainOptions
 from data import create_dataset
 from models import create_model
 from util.visualizer_offline import Visualizer
-from metrics.mse_psnr_ssim_vif import azimuthalAverage
 from util.util import save_ordered_dict_as_csv
 from tqdm import tqdm
-import numpy as np
-import json
+import torch
+from metrics.FID import *
 
 try:
     import wandb
@@ -50,45 +49,15 @@ except ImportError:
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()  # get training options
-    opt.isTrain = False
-    opt.epoch = 50
-    model = create_model(opt)  # create a model given opt.model and other options
-    model.setup2(opt, "/Volumes/sandisk/cycleGAN_results/models_cycleGAN/")  # regular setup: load and print networks; create schedulers
     visualizer = Visualizer(opt)  # create a visualizer that display/save images and plots
-    model.eval()
 
-    # elcap_complete (50 patients)
-    opt.text_file = "./data/ELCAP.csv"  # load the csv file containing test data info
-    opt.dataset_mode = "LIDC_IDRI"
-    elcap_complete = create_dataset(opt)
-    print(len(elcap_complete))
-    ####################################
-    # Test 3 (8 patient from LIDC/IDRI)
-    opt.text_file = "./data/LIDC_test.csv"  # load the csv file containing test data info
-    opt.dataset_mode = "LIDC_IDRI"
-    dataset_test_3 = create_dataset(opt)
-    print(len(dataset_test_3))
-    ####################################
+    fake_buffer = torch.load(f'/Volumes/Untitled/{opt.test_folder}/fake_buffer_{opt.test}_epoch{opt.epoch}.pth', map_location=torch.device('cpu'))
+    real_buffer = torch.load(f'/Volumes/Untitled/{opt.test_folder}/real_buffer_{opt.test}_epoch{opt.epoch}.pth', map_location=torch.device('cpu'))
 
-    opt.dataset_len = len(elcap_complete)
-    opt.test = 'elcap_complete'
-    opt.dataset_mode = "LIDC_IDRI"
-    print(f"Test: {opt.test}")
-    for j, data_test in tqdm(enumerate(elcap_complete)):
-        model.set_input(data_test)  # unpack data from data loader
-        model.test(j)  # run inference
+    print(f"len: {len(fake_buffer)}")
+    metric_obj = GANMetrics('cpu', detector_name='inceptionv3', batch_size=64)
+    fid = metric_obj.compute_fid(fake_buffer, real_buffer, len(fake_buffer))
+    fid = {"fid": fid}
+    save_ordered_dict_as_csv(fid, f"/Volumes/Untitled/{opt.test_folder}/fid_{opt.test}.csv")
 
-    model.save_raps(opt.epoch)
-
-    ####################################
-    opt.dataset_len = len(dataset_test_3)
-    opt.dataset_mode = "LIDC_IDRI"
-    opt.test = 'test_3'
-    print(f"Test: {opt.test}")
-    for j, data_test in tqdm(enumerate(dataset_test_3)):
-        model.set_input(data_test)  # unpack data from data loader
-        model.test(j)  # run inference
-
-    model.save_raps(opt.epoch)
-
-
+    # python3 ./test_fid.py --name pix-2-pix_baseline --dataroot False --gpu_ids -1 --no_html --display_id 0 --test_folder test_pix2pix_texture_avg_window_5 --epoch 50 --test test_1

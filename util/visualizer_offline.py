@@ -271,9 +271,9 @@ class Visualizer():
         # util.save_plots(tracked_metrics, metric_path, name_title)  # save the plots to the disk
         csv_path1 = os.path.join(self.metric_dir, f'metrics_{self.opt.test}.csv')
         csv_path2 = os.path.join(self.metric_dir, f'metrics_{self.opt.test}_epoch{epoch}.csv')
-        util.save_ordered_dict_as_csv(tracked_metrics, csv_path1)
-        if epoch == 1 or epoch == 200:
-            util.save_ordered_dict_as_csv(epoch_performance, csv_path2)
+
+        # util.save_ordered_dict_as_csv(tracked_metrics, csv_path1)
+        util.save_ordered_dict_as_csv(epoch_performance, csv_path2)
 
     # losses: same format as |losses| of plot_current_losses
     def print_current_losses(self, epoch, iters, losses, t_comp, t_data):

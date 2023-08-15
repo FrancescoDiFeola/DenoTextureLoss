@@ -35,15 +35,17 @@ def texture_loss(fake_im, real_im, operator, opt, model=None):
     textures_fake = texture_extractor(fake_im, opt)
 
     if opt.texture_criterion == 'attention':
-        criterion = operator(textures_fake, textures_real).view(2, 1, 4, 4)
+        criterion = operator(textures_fake, textures_real).view(opt.batch_size, 1, 4, 4)
         normalized_criterion = (criterion - criterion.min()) / (criterion.max() - criterion.min())
+        print(normalized_criterion.shape)
         out_attention, map, weight = model(normalized_criterion)
+        print(out_attention.shape)
         loss_cycle_texture = abs(torch.mean(torch.sum(out_attention, dim=(2, 3))))
 
         return loss_cycle_texture, map, weight
 
     elif opt.texture_criterion == 'max':
-        delta_grids = operator(textures_fake, textures_real).view(2, -1)  # change shape from BxCxHxW to Bx(HXW)
+        delta_grids = operator(textures_fake, textures_real).view(opt.batch_size, -1)  # change shape from BxCxHxW to Bx(HXW)
         criterion_texture, _ = torch.max(delta_grids, dim=1)  # return a tensor 1xB
 
         # compute the loss function by averaging over the batch
@@ -51,19 +53,18 @@ def texture_loss(fake_im, real_im, operator, opt, model=None):
         return loss_cycle_texture, delta_grids, criterion_texture
 
     elif opt.texture_criterion == 'average':
-        delta_grids = operator(textures_fake, textures_real).view(2, -1)  # change shape from BxCxHxW to Bx(HXW)
+        delta_grids = operator(textures_fake, textures_real).view(opt.batch_size, -1)  # change shape from BxCxHxW to Bx(HXW)
         criterion_texture = torch.mean(delta_grids, dim=1)  # return a tensor 1xB
         loss_cycle_texture = torch.mean(criterion_texture)
 
         return loss_cycle_texture
 
     elif opt.texture_criterion == 'Frobenius':
-        delta_grids = operator(textures_fake, textures_real).view(2, -1)  # change shape from BxCxHxW to Bx(HXW)
+        delta_grids = operator(textures_fake, textures_real).view(opt.batch_size, -1)  # change shape from BxCxHxW to Bx(HXW)
         criterion_texture = frobenius_dist(delta_grids)  # return a tensor 1xB
         loss_cycle_texture = torch.mean(criterion_texture)
 
         return loss_cycle_texture
-
 
 
 def frobenius_dist(t1):

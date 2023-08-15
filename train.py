@@ -21,6 +21,7 @@ See frequently asked questions at: https://github.com/junyanz/pytorch-CycleGAN-a
 import time
 from options.train_options import TrainOptions
 from data import create_dataset
+from loss_functions.early_stopping import EarlyStopping
 from models import create_model
 from util.visualizer_offline import Visualizer
 from util.util import save_ordered_dict_as_csv
@@ -55,9 +56,9 @@ if __name__ == '__main__':
     dataset_test_3 = create_dataset(opt)
     print(len(dataset_test_3))
 
+    opt.batch_size = 2
     for epoch in range(opt.epoch_count,
                        opt.n_epochs + opt.n_epochs_decay + 1):  # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
-        print(opt.batch_size)
         epoch_start_time = time.time()  # timer for entire epoch
         iter_data_time = time.time()  # timer for data loading per iteration
         epoch_iter = 0  # the number of training iterations in current epoch, reset to 0 every epoch

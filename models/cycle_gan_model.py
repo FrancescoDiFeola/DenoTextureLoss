@@ -1,7 +1,5 @@
 import itertools
-
 import torch
-
 from util.image_pool import ImagePool
 from util.util import *
 from .base_model import BaseModel, OrderedDict
@@ -13,9 +11,10 @@ from loss_functions.attention import Self_Attn
 from metrics.FID import *
 from loss_functions.perceptual_loss import perceptual_similarity_loss
 from loss_functions.texture_loss import texture_loss
-from metrics.mse_psnr_ssim_vif import mean_squared_error, peak_signal_to_noise_ratio, structural_similarity_index, vif
+from metrics.mse_psnr_ssim_vif import *
 from models.networks import init_net
 from piq import brisque
+
 
 class CycleGANModel(BaseModel):
     """
@@ -110,6 +109,7 @@ class CycleGANModel(BaseModel):
         self.metric_names = ['psnr', 'mse', 'ssim', 'vif', 'NIQE', 'FID', 'brisque']
         self.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web')
         self.loss_dir = os.path.join(self.web_dir, f'{opt.loss_folder}')
+        self.metric_dir = os.path.join(self.web_dir, f'{opt.metric_folder}')
 
         self.metrics_eval = OrderedDict()
         for key in self.metric_names:
@@ -131,15 +131,10 @@ class CycleGANModel(BaseModel):
             self.avg_metrics_test_3[key]['mean'] = list()
             self.avg_metrics_test_3[key]['std'] = list()
 
-        # block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
-        # self.inception_model = InceptionV3([block_idx])
-        # self.clip_net = load_feature_network(network_name='inception_v3_tf')
-        #  print(self.clip_net)
-
-        # self.real_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
-        # self.fake_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
+        self.fid_object = GANMetrics('cpu', detector_name='inceptionv3', batch_size=64)
         self.real_test_buffer = []
         self.fake_test_buffer = []
+        self.raps = list()
 
         # NIQE metric
         self.niqe = pyiqa.create_metric('niqe', device=torch.device('cpu'), as_loss=False)
@@ -149,7 +144,7 @@ class CycleGANModel(BaseModel):
         if self.isTrain:
             self.model_names = ['G_A', 'G_B', 'D_A', 'D_B']
         else:  # during test time, only load Gs
-            self.model_names = ['G_A', 'G_B']
+            self.model_names = ['G_A']  # ['G_A', 'G_B']
 
         # define networks (both Generators and discriminators)
         # The naming is different from those used in the paper.
@@ -232,16 +227,15 @@ class CycleGANModel(BaseModel):
     def test(self, idx):
         with torch.no_grad():
             self.fake_B = self.netG_A(self.real_A)
-            self.fake_test_buffer.append(self.fake_B)
-            self.real_test_buffer.append(self.real_B)
-            # self.compute_metrics(idx)
-            # self.track_metrics()
+            self.compute_metrics(idx)
+            self.track_metrics()
 
     def compute_metrics(self, idx):
         if self.opt.dataset_mode == "LIDC_IDRI":
             # NIQE
-            fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
-            self.NIQE = self.niqe(fake_B_3channels).item()
+            # fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
+            self.NIQE = 0  # self.niqe(fake_B_3channels).item()
+            self.raps.append(azimuthalAverage(np.squeeze(self.fake_B[0, 0, :, :].cpu().detach().numpy())).tolist())
             self.brisque = 0
             self.mse = 0
             self.psnr = 0
@@ -249,15 +243,14 @@ class CycleGANModel(BaseModel):
             self.vif = 0
         elif self.opt.test == "elcap_complete":
             # NIQE
-            fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
-            self.NIQE = self.niqe(fake_B_3channels).item()
+            # fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
+            self.NIQE = 0  # self.niqe(fake_B_3channels).item()
+            self.raps.append(azimuthalAverage(np.squeeze(self.fake_B[0, 0, :, :].cpu().detach().numpy())).tolist())
             self.brisque = 0
             self.mse = 0
             self.psnr = 0
             self.ssim = 0
             self.vif = 0
-            # FID
-            # self.compute_fid(idx)
         else:
             x = tensor2im2(self.real_B)
             y = tensor2im2(self.fake_B)
@@ -274,8 +267,9 @@ class CycleGANModel(BaseModel):
             self.brisque = brisque(((self.fake_B + 1) * 0.5).expand(-1, 1, -1, -1)).item()
             # VIF
             self.vif = vif(x, y)
-            # FID
-            # self.compute_fid(idx)
+
+            self.fake_test_buffer.append(self.fake_B)
+            self.real_test_buffer.append(self.real_B)
 
     def compute_fid(self, idx):
         '''
@@ -442,8 +436,19 @@ class CycleGANModel(BaseModel):
         np.save(f"{self.loss_dir}/weight_A.npy", np.array(self.weight_A))
         np.save(f"{self.loss_dir}/weight_B.npy", np.array(self.weight_B))
 
-    def save_list_images(self):
+    def save_list_images(self, epoch):
         real_buffer = torch.cat(self.real_test_buffer, dim=0)
         fake_buffer = torch.cat(self.fake_test_buffer, dim=0)
-        torch.save(real_buffer, f'./real_buffer.pth')
-        torch.save(fake_buffer, f'./fake_buffer.pth')
+
+        fid_score = self.fid_object.compute_fid(fake_buffer, real_buffer, self.opt.dataset_len)
+        self.metrics_eval['FID'].append(fid_score)
+
+        # torch.save(real_buffer, f'{self.test_dir}/real_buffer_{self.opt.test}_epoch{epoch}.pth')
+        # torch.save(fake_buffer, f'{self.test_dir}/fake_buffer_{self.opt.test}_epoch{epoch}.pth')
+
+        self.real_test_buffer = []
+        self.fake_test_buffer = []
+
+    def save_raps(self, epoch):
+        save_json(self.raps, f"{self.metric_dir}/raps_{self.opt.test}_epoch{epoch}")
+        self.raps = []

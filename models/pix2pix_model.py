@@ -3,11 +3,11 @@ from . import networks
 import os
 import itertools
 from .vgg import VGG
-from util.util import tensor2im2, save_list_to_csv
+from util.util import tensor2im2, save_list_to_csv, save_json
 import pyiqa
 from loss_functions.attention import Self_Attn
 from metrics.FID import *
-from metrics.mse_psnr_ssim_vif import mean_squared_error, peak_signal_to_noise_ratio, structural_similarity_index, vif
+from metrics.mse_psnr_ssim_vif import *
 from loss_functions.texture_loss import texture_loss
 from loss_functions.perceptual_loss import perceptual_similarity_loss
 from models.networks import init_net
@@ -90,6 +90,8 @@ class Pix2PixModel(BaseModel):
         self.metric_names = ['psnr', 'mse', 'ssim', 'vif', 'NIQE', 'FID', 'brisque']
         self.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web')
         self.loss_dir = os.path.join(self.web_dir, f'{opt.loss_folder}')
+        self.metric_dir = os.path.join(self.web_dir, f'{opt.metric_folder}')
+        self.test_dir = os.path.join(self.web_dir, f'{opt.test_folder}')
 
         self.metrics_eval = OrderedDict()
         for key in self.metric_names:
@@ -111,12 +113,11 @@ class Pix2PixModel(BaseModel):
             self.avg_metrics_test_3[key]['mean'] = list()
             self.avg_metrics_test_3[key]['std'] = list()
 
-        # self.fid = FrechetInceptionDistance(feature=64, normalize=True)
-        # block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
-        # self.inception_model = InceptionV3([block_idx])
+        self.fid_object = GANMetrics('cpu', detector_name='inceptionv3', batch_size=64)
 
-        # self.real_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
-        # self.fake_test_buffer = torch.empty((1, 3, self.opt.load_size, self.opt.load_size))
+        self.real_test_buffer = []
+        self.fake_test_buffer = []
+        self.raps = list()
 
         # NIQE metric
         self.niqe = pyiqa.create_metric('niqe', device=torch.device('cpu'), as_loss=False)
@@ -190,26 +191,28 @@ class Pix2PixModel(BaseModel):
             self.track_metrics()
 
     def compute_metrics(self, idx):
-        if self.opt.dataset_mode == "LIDC_IDRI":
+        if self.opt.test == "test_3":
             # NIQE
             fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
             self.NIQE = self.niqe(fake_B_3channels).item()
+            self.raps.append(azimuthalAverage(np.squeeze(self.fake_B[0, 0, :, :].cpu().detach().numpy())).tolist())
             self.brisque = 0
             self.mse = 0
             self.psnr = 0
             self.ssim = 0
             self.vif = 0
+            self.fid = 0
         elif self.opt.test == "elcap_complete":
             # NIQE
             fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
             self.NIQE = self.niqe(fake_B_3channels).item()
+            self.raps.append(azimuthalAverage(np.squeeze(self.fake_B[0, 0, :, :].cpu().detach().numpy())).tolist())
             self.brisque = 0
             self.mse = 0
             self.psnr = 0
             self.ssim = 0
             self.vif = 0
-            # FID
-            # self.compute_fid(idx)
+            self.fid = 0
         else:
             x = tensor2im2(self.real_B)
             y = tensor2im2(self.fake_B)
@@ -223,18 +226,23 @@ class Pix2PixModel(BaseModel):
             fake_B_3channels = self.fake_B.expand(-1, 3, -1, -1)
             self.NIQE = self.niqe(fake_B_3channels).item()
 
-            self.brisque = brisque(((self.fake_B + 1) * 0.5).expand(-1, 1, -1, -1)).item()
+            self.brisque = 0
             # VIF
             self.vif = vif(x, y)
             # FID
-            # self.compute_fid(idx)
+            self.fake_test_buffer.append(self.fake_B)
+            self.real_test_buffer.append(self.real_B)
 
-    def compute_fid(self, idx):
-        """if idx == self.opt.dataset_len - 1:
-        fid_index = calculate_frechet(self.real_test_buffer, self.fake_test_buffer, self.inception_model)
-        self.metrics_eval['FID'].append(fid_index)
-        else:"""
-        pass
+    '''def compute_fid(self, idx):
+        if idx == self.opt.dataset_len - 1:
+            self.real_test_buffer = torch.cat(self.real_test_buffer)
+            self.fake_test_buffer = torch.cat(self.fake_test_buffer)
+            fid_index = calculate_frechet(self.real_test_buffer, self.fake_test_buffer, self.inception_model)
+            self.metrics_eval['FID'].append(fid_index)
+            self.real_test_buffer = []
+            self.fake_test_buffer = []
+        else:
+            pass'''
 
     def backward_D(self):
         """Calculate GAN loss for the discriminator"""
@@ -263,13 +271,13 @@ class Pix2PixModel(BaseModel):
 
             if self.opt.texture_criterion == 'attention':
                 loss_texture, map_B, weight_B = texture_loss(self.fake_B, self.real_B, self.criterionTexture, self.opt,
-                                                             self.attention)
-                self.loss_texture = loss_texture * lambda_texture
+                                                             self.attention)  # , map_B, weight_B
+                self.loss_texture = loss_texture
 
                 self.weight.append(weight_B.item())
                 # self.attention_B.append(map_B)
 
-            if self.opt.texture_criterion == 'max':
+            elif self.opt.texture_criterion == 'max':
                 loss_texture, delta_grids_B, criterion_texture_B = texture_loss(self.fake_B, self.real_B,
                                                                                 self.criterionTexture, self.opt)
 
@@ -330,3 +338,20 @@ class Pix2PixModel(BaseModel):
 
     def save_attention_weights(self):
         np.save(f"{self.loss_dir}/weight.npy", np.array(self.weight))
+
+    def save_list_images(self, epoch):
+        real_buffer = torch.cat(self.real_test_buffer, dim=0)
+        fake_buffer = torch.cat(self.fake_test_buffer, dim=0)
+
+        fid_score = self.fid_object.compute_fid(fake_buffer, real_buffer, self.opt.dataset_len)
+        self.metrics_eval['FID'].append(fid_score)
+
+        # torch.save(real_buffer, f'{self.test_dir}/real_buffer_{self.opt.test}_epoch{epoch}.pth')
+        # torch.save(fake_buffer, f'{self.test_dir}/fake_buffer_{self.opt.test}_epoch{epoch}.pth')
+
+        self.real_test_buffer = []
+        self.fake_test_buffer = []
+
+    def save_raps(self, epoch):
+        save_json(self.raps, f"{self.metric_dir}/raps_{self.opt.test}_epoch{epoch}")
+        self.raps = []

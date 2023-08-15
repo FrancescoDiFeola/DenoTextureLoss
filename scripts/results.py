@@ -5,6 +5,8 @@ import torch
 from scipy.stats import wilcoxon
 import os
 import pylab as py
+import json
+
 
 def convert_string_to_floats(long_string_with_commas):
     long_string_without_brackets = long_string_with_commas.replace('[', '').replace(']', '')
@@ -102,8 +104,8 @@ def avg_fid(path1, path2, path3):
 def element_wise_average(lists):
     list_lengths = [len(sublist) for sublist in lists[0]]
 
-    #if any(length != list_lengths[0] for length in list_lengths):
-    #     raise ValueError("All lists must have the same length")
+    if any(length != list_lengths[0] for length in list_lengths):
+        raise ValueError("All lists must have the same length")
 
     result = []
     for sublists in zip(*lists):
@@ -113,7 +115,7 @@ def element_wise_average(lists):
         avg_sublist = [sum(values) / len(values) for values in zip(*sublists)]
         result.append(avg_sublist)
 
-    return result
+    return [np.mean(k) for k in zip(*result)]
 
 
 def compute_average_profiles(folder_path, **kwargs):
@@ -124,34 +126,35 @@ def compute_average_profiles(folder_path, **kwargs):
     profiles = []
     for i in path_list:
         experiment_profile = open(i)
+        experiment_profile = json.load(experiment_profile)
         profiles.append(experiment_profile)
 
     return element_wise_average(profiles)
 
 
-
 if __name__ == '__main__':
-
     # RAPS (radially averaged-power spectrum)
 
     # baseline
     profile_elcap_baseline = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_baseline_window_4/raps_elcap_complete_epoch50.json",
                                                       path_2="metrics_pix2pix_baseline_window_5/raps_elcap_complete_epoch50.json",
                                                       path_3="metrics_pix2pix_baseline_window_6/raps_elcap_complete_epoch50.json")
-    profile_test3_baseline = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_baseline_window_4/raps_test_3_epoch50.json",
+    profile_test_3_baseline = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_baseline_window_4/raps_test_3_epoch50.json",
                                                       path_2="metrics_pix2pix_baseline_window_5/raps_test_3_epoch50.json",
                                                       path_3="metrics_pix2pix_baseline_window_6/raps_test_3_epoch50.json")
 
     # texture max
-    profile_elcap_texture_max = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50",path_1="metrics_pix2pix_texture_max_window_4/raps_elcap_complete_epoch50.json",
-                                                      path_2="metrics_pix2pix_texture_max_window_5/raps_elcap_complete_epoch50.json",
-                                                      path_3="metrics_pix2pix_texture_max_window_6/raps_elcap_complete_epoch50.json")
+    profile_elcap_texture_max = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50",
+                                                         path_1="metrics_pix2pix_texture_max_window_4/raps_elcap_complete_epoch50.json",
+                                                         path_2="metrics_pix2pix_texture_max_window_5/raps_elcap_complete_epoch50.json",
+                                                         path_3="metrics_pix2pix_texture_max_window_6/raps_elcap_complete_epoch50.json")
 
-    profile_test_3_texture_max = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50",path_1="metrics_pix2pix_texture_max_window_4/raps_test_3_epoch50.json",
-                                                      path_2="metrics_pix2pix_texture_max_window_5/raps_test_3_epoch50.json",
-                                                      path_3="metrics_pix2pix_texture_max_window_6/raps_test_3_epoch50.json")
+    profile_test_3_texture_max = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_texture_max_window_4/raps_test_3_epoch50.json",
+                                                          path_2="metrics_pix2pix_texture_max_window_5/raps_test_3_epoch50.json",
+                                                          path_3="metrics_pix2pix_texture_max_window_6/raps_test_3_epoch50.json")
     # texture avg
-    profile_elcap_texture_avg = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_texture_avg_window_4/raps_elcap_complete_epoch50.json",
+    profile_elcap_texture_avg = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50",
+                                                         path_1="metrics_pix2pix_texture_avg_window_4/raps_elcap_complete_epoch50.json",
                                                          path_2="metrics_pix2pix_texture_avg_window_5/raps_elcap_complete_epoch50.json",
                                                          path_3="metrics_pix2pix_texture_avg_window_6/raps_elcap_complete_epoch50.json")
 
@@ -159,15 +162,17 @@ if __name__ == '__main__':
                                                           path_2="metrics_pix2pix_texture_avg_window_5/raps_test_3_epoch50.json",
                                                           path_3="metrics_pix2pix_texture_avg_window_6/raps_test_3_epoch50.json")
     # texture frobenius
-    profile_elcap_texture_Frob = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_texture_Frob_window_4/raps_elcap_complete_epoch50.json",
-                                                         path_2="metrics_pix2pix_texture_Frob_window_5/raps_elcap_complete_epoch50.json",
-                                                         path_3="metrics_pix2pix_texture_Frob_window_6/raps_elcap_complete_epoch50.json")
+    profile_elcap_texture_Frob = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50",
+                                                          path_1="metrics_pix2pix_texture_Frob_window_4/raps_elcap_complete_epoch50.json",
+                                                          path_2="metrics_pix2pix_texture_Frob_window_5/raps_elcap_complete_epoch50.json",
+                                                          path_3="metrics_pix2pix_texture_Frob_window_6/raps_elcap_complete_epoch50.json")
 
     profile_test_3_texture_Frob = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_texture_Frob_window_4/raps_test_3_epoch50.json",
-                                                          path_2="metrics_pix2pix_texture_Frob_window_5/raps_test_3_epoch50.json",
-                                                          path_3="metrics_pix2pix_texture_Frob_window_6/raps_test_3_epoch50.json")
+                                                           path_2="metrics_pix2pix_texture_Frob_window_5/raps_test_3_epoch50.json",
+                                                           path_3="metrics_pix2pix_texture_Frob_window_6/raps_test_3_epoch50.json")
     # texture attention
-    profile_elcap_texture_att = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_texture_att_window_13/raps_elcap_complete_epoch50.json",
+    profile_elcap_texture_att = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50",
+                                                         path_1="metrics_pix2pix_texture_att_window_13/raps_elcap_complete_epoch50.json",
                                                          path_2="metrics_pix2pix_texture_att_window_14/raps_elcap_complete_epoch50.json",
                                                          path_3="metrics_pix2pix_texture_att_window_15/raps_elcap_complete_epoch50.json")
 
@@ -176,12 +181,48 @@ if __name__ == '__main__':
                                                           path_3="metrics_pix2pix_texture_att_window_15/raps_test_3_epoch50.json")
     # perceptual
     profile_elcap_perceptual = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_perceptual_window_4/raps_elcap_complete_epoch50.json",
-                                                         path_2="metrics_pix2pix_perceptual_window_5/raps_elcap_complete_epoch50.json",
-                                                         path_3="metrics_pix2pix_perceptual_window_6/raps_elcap_complete_epoch50.json")
+                                                        path_2="metrics_pix2pix_perceptual_window_5/raps_elcap_complete_epoch50.json",
+                                                        path_3="metrics_pix2pix_perceptual_window_6/raps_elcap_complete_epoch50.json")
 
     profile_test_3_perceptual = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_perceptual_window_4/raps_test_3_epoch50.json",
-                                                          path_2="metrics_pix2pix_perceptual_window_5/raps_test_3_epoch50.json",
-                                                          path_3="metrics_pix2pix_perceptual_window_6/raps_test_3_epoch50.json")
+                                                         path_2="metrics_pix2pix_perceptual_window_5/raps_test_3_epoch50.json",
+                                                         path_3="metrics_pix2pix_perceptual_window_6/raps_test_3_epoch50.json")
+
+    # ELCAP low-dose profile
+    raps_ld = open(f'/Volumes/sandisk/metrics_low_dose/raps_ELCAP_ld.json')
+    raps_ld = json.load(raps_ld)
+    profile_elcap_low_dose = element_wise_average([raps_ld])
+
+    # Test 3 (LIDC/IDRI) low-dose profile
+    raps_ld = open(f'/Volumes/sandisk/metrics_low_dose/raps_test_3_ld.json')
+    raps_ld = json.load(raps_ld)
+    profile_test_3_low_dose = element_wise_average([raps_ld])
+
+    # ELCAP test
+    py.semilogy(profile_elcap_baseline)
+    py.semilogy(profile_elcap_texture_max)
+    py.semilogy(profile_elcap_texture_avg)
+    py.semilogy(profile_elcap_texture_Frob)
+    py.semilogy(profile_elcap_texture_att)
+    py.semilogy(profile_elcap_perceptual)
+    py.semilogy(profile_elcap_low_dose)
+    py.legend(["baseline", "texture_max", "texture_avg", "texture_Frob", "texture_att", "perceptual", 'low-dose'])
+    py.grid()
+    py.title("ELCAP test at epoch 50 (pix2pix)")
+    py.show()
+
+    # Test 3
+    py.semilogy(profile_test_3_baseline)
+    py.semilogy(profile_test_3_texture_max)
+    py.semilogy(profile_test_3_texture_avg)
+    py.semilogy(profile_test_3_texture_Frob)
+    py.semilogy(profile_test_3_texture_att)
+    py.semilogy(profile_test_3_perceptual)
+    py.semilogy(profile_test_3_low_dose)
+    py.legend(["baseline", "texture_max", "texture_avg", "texture_Frob", "texture_att", "perceptual", "low-dose"])
+    py.grid()
+    py.title("LIDC/IDRI test at epoch 50 (pix2pix)")
+    py.show()
 
 
     '''for i in range(0, 7, 1):
@@ -218,7 +259,6 @@ if __name__ == '__main__':
                 '/Users/francescodifeola/Desktop/downloads_alvis/homogenization/metrics_hom_texture_att_3/metrics_test_1_epoch100.csv',
                 'baseline',
                 i)'''
-
 
     '''avg_fid, std = avg_fid(
         '/Volumes/Untitled/test_pix2pix_texture_max_window_4/fid_test_2.csv',

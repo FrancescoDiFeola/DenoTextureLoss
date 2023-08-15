@@ -6,7 +6,7 @@ from PIL import Image
 import os
 import csv
 import matplotlib.pyplot as plt
-
+import json
 
 def tensor2im(input_image, imtype=np.uint8):
     """"Converts a Tensor array into a numpy image array.
@@ -205,3 +205,9 @@ def load_saved_weights(model, saved_weights_path, device):
 def frobenious_dist(t1):
         dot_prod = t1*t1
         return torch.sqrt(torch.sum(dot_prod, dim=1))
+
+
+def save_json(data, path):
+    file_json = json.dumps(data, indent=6)
+    with open(f"{path}.json", 'w') as f:
+            f.write(file_json)
