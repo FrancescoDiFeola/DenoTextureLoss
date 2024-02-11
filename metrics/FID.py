@@ -10,9 +10,16 @@ import numpy as np
 from tqdm import tqdm
 from util.util import save_ordered_dict_as_csv
 
+
 def list_iterator(data, batch_size):
     for i in tqdm(range(0, len(data), batch_size)):
         yield data[i:i + batch_size]  # When a function contains the yield keyword, it becomes a generator function.
+
+
+def weights_init_normal(m):
+    classname = m.__class__.__name__
+    if classname.find("Conv") != -1:
+        torch.nn.init.normal_(m.weight.data, 0.0, 0.02)
 
 
 class InceptionV3(nn.Module):
@@ -35,7 +42,8 @@ class InceptionV3(nn.Module):
                  resize_input=True,
                  normalize_input=False,
                  requires_grad=False,
-                 device="cpu"):
+                 device="cpu",
+                 pretrained=True):
 
         super(InceptionV3, self).__init__()
 
@@ -49,7 +57,10 @@ class InceptionV3(nn.Module):
 
         self.blocks = nn.ModuleList()
 
-        inception = models.inception_v3(pretrained=True).to(device)
+        if pretrained == True:
+            inception = models.inception_v3(pretrained=True).to(device)
+        else:
+            inception = weights_init_normal(models.inception_v3(pretrained=False)).to(device)
 
         # Block 0: input to maxpool1
         block0 = [
@@ -236,7 +247,7 @@ class FeatureStats:
 
 class GANMetrics:
 
-    def __init__(self, device, detector_name='inceptionv3', batch_size=64):
+    def __init__(self, device, detector_name='inceptionv3', batch_size=1024, pretrained=True):
 
         self.device = device
         self.detector_name = detector_name
@@ -245,7 +256,7 @@ class GANMetrics:
         if self.detector_name == 'inceptionv3':
             dims = 2048
             block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
-            model = InceptionV3([block_idx]).to(self.device)
+            model = InceptionV3([block_idx], pretrained).to(self.device)
 
             # wrapper model to pytorch_fid model
             wrapper_model = WrapperInceptionV3(model)
@@ -260,7 +271,6 @@ class GANMetrics:
         assert stats.max_items is not None
 
         imgs_iterator = list_iterator(imgs, self.batch_size)
-
         # Main loop.
         for img in imgs_iterator:
             img = img.to(self.device)
@@ -296,13 +306,9 @@ class GANMetrics:
 
 
 if __name__ == '__main__':
-    weight = np.load("/Users/francescodifeola/Desktop/pix2pix_results/losses_ep50/loss_pix2pix_texture_att_window_13/weight.npy")
-    plt.plot(range(0,16800), weight)
-    plt.show()
-    print(weight.shape)
 
-    fake_buffer = torch.load('/Volumes/Untitled/test_pix2pix_perceptual_window_5/fake_buffer_test_1_epoch50.pth', map_location=torch.device('cpu'))
-    real_buffer = torch.load('/Volumes/Untitled/test_pix2pix_perceptual_window_5/real_buffer_test_1_epoch50.pth',  map_location=torch.device('cpu'))
+    fake_buffer = torch.load('/Volumes/sandisk/pix2pix_results/test/test_pix2pix_baseline_window_4/fake_buffer_test_1_epoch50.pth', map_location=torch.device('cpu'))
+    real_buffer = torch.load('/Volumes/sandisk/pix2pix_results/test/test_pix2pix_baseline_window_4/real_buffer_test_1_epoch50.pth', map_location=torch.device('cpu'))
     print(fake_buffer.shape)
     print(real_buffer.shape)
 
@@ -312,8 +318,8 @@ if __name__ == '__main__':
         plt.imshow(fake_buffer[i, 0, :, :], cmap='gray')
         plt.show()'''
 
-    metric_obj = GANMetrics('cpu', detector_name='inceptionv3', batch_size=64)
+    metric_obj = GANMetrics('cpu', detector_name='inceptionv3', batch_size=560, pretrained=False)
     fid = metric_obj.compute_fid(fake_buffer, real_buffer, 560)
     fid = {'fid': fid}
-    save_ordered_dict_as_csv(fid, "/Volumes/Untitled/test_pix2pix_perceptual_window_5/fid_test_1.csv")
-
+    print(fid)
+    # save_ordered_dict_as_csv(fid, "/Volumes/Untitled/test_pix2pix_perceptual_window_5/fid_test_1.csv")

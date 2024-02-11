@@ -1,6 +1,5 @@
 import itertools
 from models.unit_networks import *
-from data.storage import *
 import torch
 from collections import OrderedDict
 import os
@@ -29,7 +28,18 @@ def compute_kl(mu):
     return loss
 
 
-class UNITModel(BaseModel):
+def ada_in(content_feature, mean_s, std_s, epsilon=1e-5):
+    # Calculate mean and standard deviation of content feature
+    mean_c = torch.mean(content_feature, dim=(2, 3), keepdim=True)
+    std_c = torch.std(content_feature, dim=(2, 3), keepdim=True) + epsilon
+
+    # Apply AdaIN formula
+    normalized_content = std_s.unsqueeze(2).unsqueeze(3) * (content_feature - mean_c) / (std_c + 1e-5) + mean_s.unsqueeze(2).unsqueeze(3)
+
+    return normalized_content
+
+
+class UNITMODIFIEDModel(BaseModel):
 
     def __init__(self, opt):
         """Initialize the UNIT class.
@@ -53,10 +63,13 @@ class UNITModel(BaseModel):
         self.E1 = Encoder(dim=opt.dim, n_downsample=opt.n_downsample, shared_block=shared_E)
         self.E2 = Encoder(dim=opt.dim, n_downsample=opt.n_downsample, shared_block=shared_E)
         shared_G = ResidualBlock(features=shared_dim)
-        self.G1 = Generator(dim=opt.dim, n_upsample=opt.n_downsample, shared_block=shared_G)
-        self.G2 = Generator(dim=opt.dim, n_upsample=opt.n_downsample, shared_block=shared_G)
+        self.G1 = Generator_AdaIn(dim=opt.dim, n_upsample=opt.n_downsample, shared_block=shared_G)
+        self.G2 = Generator_AdaIn(dim=opt.dim, n_upsample=opt.n_downsample, shared_block=shared_G)
         self.D1 = Discriminator(input_shape)
         self.D2 = Discriminator(input_shape)
+
+        self.Es1 = StyleEncoder().to(self.device)
+        self.Es2 = StyleEncoder().to(self.device)
 
         self.E1 = self.E1.to(self.device)
         self.E2 = self.E2.to(self.device)
@@ -66,6 +79,12 @@ class UNITModel(BaseModel):
         self.D2 = self.D2.to(self.device)
         self.criterion_GAN.to(self.device)
         self.criterion_pixel.to(self.device)
+
+        # AdaIN params
+        self.mean_s = 0
+        self.std_s = 0
+        self.test_mean_s = 0
+        self.test_std_s = 0
 
         # Initialize weights
         self.E1.apply(weights_init_normal)
@@ -135,9 +154,6 @@ class UNITModel(BaseModel):
         for key in self.metric_names:
             self.metrics_eval[key] = list()
 
-        # dictionary to store metrics per patient
-
-
         # metrics initialization
         self.fid_object = GANMetrics('cpu', detector_name='inceptionv3', batch_size=64)
         self.real_test_buffer = []
@@ -145,6 +161,10 @@ class UNITModel(BaseModel):
         self.raps = list()
         # NIQE metric
         self.niqe = pyiqa.create_metric('niqe', device=torch.device('cpu'), as_loss=False)
+
+        # standardized buffer, not standardized buffer
+        self.standardized_test_buffer = []
+        self.not_standardized_test_buffer = []
 
         # Folders initialization
         self.web_dir = os.path.join(opt.checkpoints_dir, opt.name, 'web')
@@ -169,8 +189,8 @@ class UNITModel(BaseModel):
         The option 'direction' can be used to swap domain A and domain B.
         """
         if self.opt.dataset_mode == "LIDC_IDRI":
-            self.X1 = input['img'].type(self.Tensor).expand(-1, 3, -1, -1).to(self.device)
-            self.image_paths = input['im_paths']
+            self.X = input['img'].type(self.Tensor).expand(-1, 3, -1, -1).to(self.device)
+            self.domain = input['domain'][0]
         else:
             # Set model input
             self.X1 = input["A"].type(self.Tensor).expand(-1, 3, -1, -1).to(self.device)
@@ -189,28 +209,36 @@ class UNITModel(BaseModel):
         self.mu1, self.Z1 = self.E1(self.X1)
         self.mu2, self.Z2 = self.E2(self.X2)
 
+        self.mean_1, self.std_1 = self.Es1(self.X1)
+        self.mean_2, self.std_2 = self.Es2(self.X2)
 
         # Reconstruct images
-        self.recon_X1 = self.G1(self.Z1)
-        self.recon_X2 = self.G2(self.Z2)
+        self.recon_X1 = self.G1(self.Z1, self.mean_1, self.std_1)
+        self.recon_X2 = self.G2(self.Z2, self.mean_2, self.std_2)
 
         # Translate images
-        self.fake_X1 = self.G1(self.Z2)
-        self.fake_X2 = self.G2(self.Z1)
+        self.fake_X1 = self.G1(self.Z2, self.mean_1, self.std_1)
+        self.fake_X2 = self.G2(self.Z1, self.mean_2, self.std_2)
 
         # Cycle translation
         self.mu1_, self.Z1_ = self.E1(self.fake_X1)
         self.mu2_, self.Z2_ = self.E2(self.fake_X2)
-        self.cycle_X1 = self.G1(self.Z2_)
-        self.cycle_X2 = self.G2(self.Z1_)
+
+        self.mean_1, self.std_1 = self.Es1(self.fake_X1)
+        self.mean_2, self.std_2 = self.Es2(self.fake_X2)
+
+        self.cycle_X1 = self.G1(self.Z2_, self.mean_1, self.std_1)
+        self.cycle_X2 = self.G2(self.Z1_, self.mean_2, self.std_2)
 
     def test(self):
         with torch.no_grad():
-            _, self.Z1 = self.E1(self.X1)
-            self.fake_X2 = self.G2(self.Z1)
-            self.compute_metrics()
-            self.track_metrics()
-            print(self.fake_X2.shape)
+            if self.domain == "B30":
+                _, self.Z1 = self.E1(self.X)
+                self.fake = self.G1(self.Z1, self.test_mean_s, self.test_std_s)  # standardized
+
+            elif self.domain == "D45":
+                _, self.Z2 = self.E2(self.X)
+                self.fake = self.G2(self.Z2, self.test_mean_s, self.test_std_s)  # standardized
 
     def backwark_encoderGen(self):
         self.loss_GAN_1 = self.opt.lambda_0 * self.criterion_GAN(self.D1(self.fake_X1), self.valid)
@@ -229,7 +257,7 @@ class UNITModel(BaseModel):
             if self.opt.texture_criterion == 'attention':
                 loss_texture_X1, _, weight_X1 = texture_loss(self.recon_X1, self.X1, self.criterionTexture, self.opt, self.attention)
                 loss_texture_X2, _, weight_X2 = texture_loss(self.recon_X2, self.X2, self.criterionTexture, self.opt, self.attention)
-                print(loss_texture_X2)
+
                 self.loss_cycle_texture_X1 = loss_texture_X1
                 self.loss_cycle_texture_X2 = loss_texture_X2
                 self.weight_X1.append(weight_X1.item())
@@ -313,6 +341,13 @@ class UNITModel(BaseModel):
         self.backward_D2()
         self.optimizer_D2.step()
 
+        self.combine_adain_params([self.mean_1, self.mean_2], [self.std_1, self.std_2])
+
+    def combine_adain_params(self, means, stds):
+        self.mean_s = sum(means) / len(means)
+        self.std_s = sum(stds) / len(stds)
+
+
     def update_learning_rate(self):
         # Update learning rates
         self.lr_scheduler_G.step()
@@ -375,47 +410,7 @@ class UNITModel(BaseModel):
         torch.save(self.G2.state_dict(), f"{self.save_dir}/G2_ep{epoch}_{self.opt.experiment_name}.pth")
         torch.save(self.D1.state_dict(), f"{self.save_dir}/D1_ep{epoch}_{self.opt.experiment_name}.pth")
         torch.save(self.D2.state_dict(), f"{self.save_dir}/D2_ep{epoch}_{self.opt.experiment_name}.pth")
-    def setup1(self, opt):
-        """Load and print networks; create schedulers
 
-        Parameters:
-            opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
-        """
-        self.load_networks_1(opt.epoch, opt.experiment_name)
-        # self.print_networks(opt.verbose)
-
-    def load_networks_1(self, epoch, exp):
-        """Load all the networks from the disk.
-
-        Parameters:
-            epoch (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
-        """
-        for name in self.model_names:
-            if isinstance(name, str):
-                load_filename = 'net_%s_ep%s_unit_%s.pth' % (name, epoch, exp)
-                load_path = os.path.join(self.save_dir, load_filename)
-                net = getattr(self, name)
-                # if isinstance(net, torch.nn.DataParallel):
-                #     net = net.module
-                print('loading the model from %s' % load_path)
-                # if you are using PyTorch newer than 0.4 (e.g., built from
-                # GitHub source), you can remove str() on self.device
-                state_dict = torch.load(load_path, map_location=str(self.device))
-                print(state_dict.keys())
-                new_state_dict = {}
-                for key, value in state_dict.items():
-                    # Remove the specific word or prefix you want to eliminate
-                    new_key = key.replace('module.', '')
-                    new_state_dict[new_key] = value
-                print(new_state_dict.keys())
-
-                # if hasattr(state_dict, '_metadata'):
-                #    del new_state_dict._metadata
-
-                """# patch InstanceNorm checkpoints prior to 0.4
-                for key in list(state_dict.keys()):  # need to copy keys here because we mutate in loop
-                    self.__patch_instance_norm_state_dict(state_dict, net, key.split('.'))"""
-                net.load_state_dict(new_state_dict)
     def compute_metrics(self):
         if self.opt.dataset_mode == "LIDC_IDRI":
             # NIQE
@@ -479,3 +474,20 @@ class UNITModel(BaseModel):
     def save_raps(self, epoch):
         save_json(self.raps, f"{self.metric_dir}/raps_{self.opt.test}_epoch{epoch}")
         self.raps = []
+
+    def save_test_images(self, epoch):
+        standardized_test = torch.cat(self.standardized_test_buffer, dim=0)
+        not_standardized_test = torch.cat(self.not_standardized_test_buffer, dim=0)
+        torch.save(standardized_test, f'{self.test_dir}/standardized_{self.opt.test}_epoch{epoch}.pth')
+        torch.save(not_standardized_test, f'{self.test_dir}/not_standardized_{self.opt.test}_epoch{epoch}.pth')
+        self.standardized_test_buffer = []
+        self.not_standardized_test_buffer = []
+
+    def save_adaIN(self, epoch):
+        torch.save(self.mean_s, f"{self.save_dir}/mean_s_ep{epoch}_{self.opt.experiment_name}.pth")
+        torch.save(self.std_s, f"{self.save_dir}/std_s_ep{epoch}_{self.opt.experiment_name}.pth")
+
+    def average_adaiN(self):
+
+        self.test_mean_s = torch.mean(self.mean_s, dim=0, keepdim=True)
+        self.test_std_s = torch.mean(self.std_s, dim=0, keepdim=True)

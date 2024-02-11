@@ -9,23 +9,6 @@ class TrainOptions(BaseOptions):
 
     def initialize(self, parser):
         parser = BaseOptions.initialize(self, parser)
-
-        parser.add_argument("--num_layers", default=10, type=int)
-        parser.add_argument("--num_channels", default=32, type=int)
-        # Need D conv_dim 64
-        parser.add_argument("--g_lr", default=1e-4, type=float)
-        parser.add_argument("--d_lr", default=1e-4, type=float)
-        parser.add_argument("--d_iter", default=1, type=int)
-        parser.add_argument("--cutmix_prob", default=0.5, type=float)
-        parser.add_argument("--img_gen_loss_weight", default=0.1, type=float)
-        parser.add_argument("--grad_gen_loss_weight", default=0.1, type=float)
-        parser.add_argument("--pix_loss_weight", default=1., type=float)
-        parser.add_argument("--grad_loss_weight", default=20., type=float)
-        parser.add_argument("--cr_loss_weight", default=1.0, type=float)
-        parser.add_argument("--cutmix_warmup_iter", default=1000, type=int)
-        parser.add_argument("--use_grad_discriminator", help='use_grad_discriminator', type=bool, default=True)
-        parser.add_argument("--moving_average", default=0.999, type=float)
-        parser.add_argument("--repeat_num", default=6, type=int)
         parser.add_argument('--phase', type=str, default='train', help='train, val, test, etc')
         parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
         parser.add_argument("--dataset_name", type=str, default="apple2orange", help="name of the dataset")
@@ -58,5 +41,38 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--test', type=str, default="test_1", help='folder to save test images')
         parser.add_argument('--experiment_name', type=str, default=None, help='experiment name')
         parser.add_argument('--texture_offsets', type=str, default="all", help='texture offsets.')
+        # optimization
+        parser.add_argument('--weight_decay', type=float, default=1e-4, help='weight decay')
+        parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
+        parser.add_argument('--save_freq', type=int, default=1000, help='save frequency')
+        parser.add_argument('--test_batch_size', type=int, default=1, help='test_batch_size')
+        parser.add_argument('--num_workers', type=int, default=16, help='num of workers to use')
+        parser.add_argument('--max_iter', type=int, default=20000, help='number of training epochs')
+        parser.add_argument('--resume_iter', type=int, default=0, help='number of training epochs')
+        parser.add_argument("--local_rank", default=0, type=int)
+        # learning rate
+        parser.add_argument('--learning_rate', type=float, default=0.05, help='learning rate')
+        parser.add_argument('--lr_decay_epochs', type=int, nargs='*', default=[700, 800, 900], help='where to decay lr, can be a list')
+        parser.add_argument('--lr_decay_rate', type=float, default=0.1,  help='decay rate for learning rate')
+        parser.add_argument('--warmup_from', type=float, default=0.01, help='the initial learning rate if warmup')
+        parser.add_argument('--warmup_epochs', type=int, default=0, help='warmup epochs')
+
+        parser.add_argument("--num_layers", default=10, type=int)
+        parser.add_argument("--num_channels", default=32, type=int)
+        # Need D conv_dim 64
+        parser.add_argument("--g_lr", default=1e-4, type=float)
+        parser.add_argument("--d_lr", default=1e-4, type=float)
+        parser.add_argument("--d_iter", default=1, type=int)
+        parser.add_argument("--cutmix_prob", default=0.5, type=float)
+        parser.add_argument("--img_gen_loss_weight", default=0.1, type=float)
+        parser.add_argument("--grad_gen_loss_weight", default=0.1, type=float)
+        parser.add_argument("--pix_loss_weight", default=1., type=float)
+        parser.add_argument("--grad_loss_weight", default=20., type=float)
+        parser.add_argument("--cr_loss_weight", default=1.0, type=float)
+        parser.add_argument("--cutmix_warmup_iter", default=1000, type=int)
+        parser.add_argument("--use_grad_discriminator", help='use_grad_discriminator', type=bool, default=True)
+        parser.add_argument("--moving_average", default=0.999, type=float)
+        parser.add_argument("--repeat_num", default=6, type=int)
+
         self.isTrain = True
         return parser

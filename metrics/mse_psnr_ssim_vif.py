@@ -1,9 +1,12 @@
 import numpy as np
 from math import log10
+
+import piq
 from scipy import fftpack
 from skimage.metrics import structural_similarity
 from sewar.full_ref import vifp
 import os
+from piq import SSIMLoss
 
 def mean_squared_error(x, y):
     # MSE
@@ -114,6 +117,21 @@ def compute_average_profiles(folder_path, **kwargs):
 
 if __name__ == "__main__":
     import torch
+    from data.storage import load_from_json
+    from skimage.feature import graycomatrix, graycoprops
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from PIL import Image
+    import skimage as ski
+
+    x = torch.rand(4, 3, 256, 256, requires_grad=True)
+
+    y = torch.rand(4, 3, 256, 256, requires_grad=True)
+
+    ssim_loss = SSIMLoss(data_range=1)
+    print(ssim_loss(x, y))
+
+    """import torch
     import matplotlib.pyplot as plt
     import pylab as py
     import json
@@ -139,4 +157,4 @@ if __name__ == "__main__":
     # hd_img = azimuthalAverage(np.squeeze(real_buffer[200, 0, :, :].cpu().detach().numpy()))
     py.semilogy(mean_profile_ld, color='red')
     # py.semilogy(hd_img, color='blue')
-    py.show()
+    py.show()"""

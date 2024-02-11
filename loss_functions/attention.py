@@ -32,6 +32,7 @@ class Self_AttnRes(nn.Module):
         proj_key = self.key_conv(x).view(m_batchsize, -1, width * height)  # B X C x (*W*H)
         energy = torch.bmm(proj_query, proj_key)  # transpose check
         attention = self.softmax(energy)  # BX (N) X (N)
+        print(attention.shape)
         # Resampling layer
         # element wise product between attention and x
 
@@ -75,9 +76,12 @@ class Self_Attn(nn.Module):
         m_batchsize, C, width, height = x.size()
         proj_query = self.query_conv(x).view(m_batchsize, -1, width * height).permute(0, 2, 1)  # B X CX(N)
         proj_key = self.key_conv(x).view(m_batchsize, -1, width * height)  # B X C x (*W*H)
+        # print(proj_query.shape)
+        # print(proj_key.shape)
         energy = torch.bmm(proj_query, proj_key)  # transpose check
+        # print(energy.shape)
         attention = self.softmax(energy)  # BX (N) X (N)
-        print(attention)
+        # print(attention.shape)
         proj_value = self.value_conv(x).view(m_batchsize, -1, width * height)  # B X C X N
         out = torch.bmm(proj_value, attention.permute(0, 2, 1))
         out = out.view(m_batchsize, C, width, height)
@@ -92,10 +96,12 @@ class Self_Attn(nn.Module):
 
 
 if __name__ == '__main__':
-    a = torch.load("/Users/francescodifeola/Desktop/downloads_alvis/attention_A.pt")
 
-    '''
-    attention = Self_Attn(1, 1, 'relu')
+
+
+    attention = Self_Attn(1, 'relu')
     tensor = torch.empty((16, 1, 4, 4))
-    out, att = attention(tensor)
-    print(out.shape)'''
+    tensor  = tensor[:, 0, :, :]
+    print(tensor.shape)
+    out, att,_ = attention(tensor)
+
