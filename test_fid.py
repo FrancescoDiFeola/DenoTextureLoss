@@ -51,6 +51,8 @@ if __name__ == '__main__':
     opt = TrainOptions().parse()  # get training options
     visualizer = Visualizer(opt)  # create a visualizer that display/save images and plots
 
+
+
     fake_buffer = torch.load(f'/Volumes/Untitled/{opt.test_folder}/fake_buffer_{opt.test}_epoch{opt.epoch}.pth', map_location=torch.device('cpu'))
     real_buffer = torch.load(f'/Volumes/Untitled/{opt.test_folder}/real_buffer_{opt.test}_epoch{opt.epoch}.pth', map_location=torch.device('cpu'))
 

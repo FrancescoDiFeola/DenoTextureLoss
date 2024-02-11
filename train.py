@@ -26,8 +26,11 @@ from models import create_model
 from util.visualizer_offline import Visualizer
 from util.util import save_ordered_dict_as_csv
 from tqdm import tqdm
+# from efemarai import ef
+import torch
 
-
+torch.manual_seed(42)
+torch.autograd.set_detect_anomaly(True)
 if __name__ == '__main__':
     opt = TrainOptions().parse()  # get training options
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options (train dataset)
@@ -64,12 +67,14 @@ if __name__ == '__main__':
         epoch_iter = 0  # the number of training iterations in current epoch, reset to 0 every epoch
         visualizer.reset()  # reset the visualizer: make sure it saves the results to HTML at least once every epoch
         for i, data in enumerate(dataset):  # inner loop within one epoch
-            iter_start_time = time.time()  # timer for computation per iteration
 
-            total_iters += opt.batch_size
-            epoch_iter += opt.batch_size
-            model.set_input(data)  # unpack data from dataset and apply preprocessing
-            model.optimize_parameters()  # calculate loss functions, get gradients, update network weights
+                iter_start_time = time.time()  # timer for computation per iteration
+
+                total_iters += opt.batch_size
+                epoch_iter += opt.batch_size
+                model.set_input(data)  # unpack data from dataset and apply preprocessing
+                model.optimize_parameters()  # calculate loss functions, get gradients, update network weights
+
 
         t_data = iter_start_time - iter_data_time
         current_losses = model.get_current_losses()

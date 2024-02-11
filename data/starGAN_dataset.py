@@ -11,7 +11,7 @@ import torch
 import matplotlib.pyplot as plt
 
 
-class LidcIdriDataset(BaseDataset):
+class StarGANDataset(BaseDataset):
     """
     This dataset class can load unaligned/unpaired datasets.
 
@@ -42,7 +42,6 @@ class LidcIdriDataset(BaseDataset):
         parser.add_argument('--window_center', type=int, default=-500,
                             help='It specifies the center of the selected HU window')
         parser.add_argument('--plot_verbose', help="Plot images.", type=bool, default=False)
-        parser.add_argument('--emphysema', help="If I am working with SCAPIS.", type=bool, default=False)
 
         return parser
 
@@ -52,6 +51,7 @@ class LidcIdriDataset(BaseDataset):
         intercept = dicom_file.RescaleIntercept
         slope = dicom_file.RescaleSlope
         image = slope * image + intercept
+
         return image
 
     @staticmethod
@@ -87,10 +87,17 @@ class LidcIdriDataset(BaseDataset):
         """
         BaseDataset.__init__(self, opt)
         annotations = self.opt.text_file
-        self.annotations = pd.read_csv(annotations)
+        if opt.isTrain or ((not self.opt.isTrain) and (self.opt.test == "test_3" or self.opt.test == "elcap_complete")):
+            self.annotations_df = pd.read_csv(annotations)
+            self.dataset_len = len(self.annotations_df)  # get the size of dataset A
+        else:
+            annotations_df = pd.read_csv(annotations)
+            self.annotations_A = annotations_df.loc[annotations_df['domain'] == self.opt.source].reset_index(drop=True)
+            self.annotations_B = annotations_df.loc[annotations_df['domain'] == self.opt.target].reset_index(drop=True)
+            self.dataset_len = len(self.annotations_A)  # get the size of dataset A
+
         self.window_width = opt.window_width
         self.window_center = opt.window_center
-        self.dataset_len = len(self.annotations)
         self.plot_verbose = opt.plot_verbose
 
     def __getitem__(self, index):
@@ -105,20 +112,38 @@ class LidcIdriDataset(BaseDataset):
             A_paths (str)    -- image paths
             B_paths (str)    -- image paths
         """
-        index = index % self.dataset_len
-        im_path = self.annotations['path_slice'].iloc[index]  # make sure index is within the range
-        domain = self.annotations['domain'].iloc[index]
-        id = self.annotations['patient'].iloc[index]
-        im = pydicom.dcmread(im_path)
-        # apply image transformation
-        img = self.transforms(im)
+        if self.opt.isTrain or ((not self.opt.isTrain) and (self.opt.test == "test_3" or self.opt.test == "elcap_complete")):
+            index = index % self.dataset_len
+            img_path = self.annotations_df['path_slice'].iloc[index]  # make sure index is within the range
+            img = pydicom.dcmread(img_path)
 
-        if self.plot_verbose:
-            self.plot_img(img, pname='LIDC image')
-            plt.hist(img.flatten())
-            plt.show()
+            # apply image transformation
+            img = self.transforms(img)
+            id = self.annotations_df['patient'].iloc[index]
 
-        return {'img': img, 'domain': domain, 'patient': id}
+            if self.annotations_df['domain'].iloc[index] == self.opt.source:
+                label = torch.Tensor([0])
+            elif self.annotations_df['domain'].iloc[index] == self.opt.target:
+                label = torch.Tensor([1])
+            else:
+                raise "NotImplemented"
+
+            return {'img': img, "label": label, "patient": id}
+
+        elif (not self.opt.isTrain) and (self.opt.test == "test_1" or self.opt.test == "test_2"):
+            index = index % self.dataset_len
+            A_path = self.annotations_A['path_slice'].iloc[index]  # make sure index is within the range
+            B_path = self.annotations_B['path_slice'].iloc[index]
+            id = self.annotations_A['patient'].iloc[index]
+            A_img = pydicom.dcmread(A_path)
+            B_img = pydicom.dcmread(B_path)
+            # apply image transformation
+            A = self.transforms(A_img)
+            B = self.transforms(B_img)
+            label_A = torch.Tensor([0])
+            label_B = torch.Tensor([1])
+
+            return {'img_A': A, 'img_B': B, 'label_A': label_A, 'label_B': label_B, "patient": id}
 
     def __len__(self):
         """Return the total number of images in the dataset.
@@ -137,29 +162,16 @@ class LidcIdriDataset(BaseDataset):
 
         return img_w
 
-    def window_norm(self, x):
-        img_min = self.window_center - self.window_width // 2
-        img_max = self.window_center + self.window_width // 2
-        newimg = 2*((x - img_min) / (img_max - img_min))-1
-        newimg[newimg < -1] = -1
-        newimg[newimg > 1] = 1
-        return newimg  # 2*newimg - 1
-
     def transforms(self, dicom, tensor_output=True):
         x = self.convert_in_hu(dicom)
 
-        if not self.opt.windowing:
+        if self.opt.windowing == False:
             x = np.clip(x, -1024, 3071)
-            x = self.normalize_img(x)
-            x = cv2.resize(x, (self.opt.load_size, self.opt.load_size))
-        elif self.opt.emphysema:
-            x = self.window_norm(x)
-            x = cv2.resize(x, (self.opt.load_size, self.opt.load_size))
         else:
             x = self.window_image(x)
-            x = self.normalize_img(x)
-            x = cv2.resize(x, (self.opt.load_size, self.opt.load_size))
 
+        x = self.normalize_img(x)
+        x = cv2.resize(x, (self.opt.load_size, self.opt.load_size))
         if tensor_output:
             x = torch.from_numpy(x)
             x = x.unsqueeze(dim=0)

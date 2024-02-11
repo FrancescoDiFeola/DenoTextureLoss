@@ -2,10 +2,12 @@ import datetime
 import time
 from data import create_dataset
 import torch
-from options.train_unit_options import TrainOptions
-from models.unit_model import UNITModel
+from options.train_redcnn_options import TrainOptions
+from models.redcnn_model import REDCNNModel
 
 cuda = True if torch.cuda.is_available() else False
+torch.manual_seed(42)
+torch.cuda.manual_seed_all(42)
 
 if __name__ == '__main__':
 
@@ -22,11 +24,13 @@ if __name__ == '__main__':
     opt.text_file = "./data/mayo_test_1p.csv"  # load the csv file containing test data info
     opt.serial_batches = True
     opt.batch_size = 1
+    opt.dataset_mode = "mayo"
     dataset_test = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options (test dataset)
     print(len(dataset_test))
     # ------------------------------
     # Test 2 (8 patient from Mayo dataset extended)
     opt.text_file = "./data/mayo_test_ext.csv"  # load the csv file containing test data info
+    opt.dataset_mode = "mayo"
     dataset_test_2 = create_dataset(opt)
     print(len(dataset_test_2))
     # ------------------------------
@@ -42,35 +46,21 @@ if __name__ == '__main__':
     dataset_test_3 = create_dataset(opt)
     print(len(dataset_test_3))
     # ------------------------------
-    model = UNITModel(opt)
+    model = REDCNNModel(opt)
 
     # ----------
     #  Training
     # ----------
-    opt.batch_size = 1
-    opt.serial_batches = False
+    opt.batch_size = 2
     prev_time = time.time()
+    opt.serial_batches = False
     for epoch in range(opt.epoch, opt.n_epochs):
-        opt.dataset_mode = "mayo"
         epoch_start_time = time.time()
+        opt.dataset_mode = "mayo"
         for i, batch in enumerate(dataset):
-
             # Set model input
             model.set_input(batch)
             model.optimize_parameters()
-
-            opt.serial_batches = True
-            opt.batch_size = 1
-            test_start = time.time()
-            opt.isTrain = False
-            model.eval()
-            # ---------------------------------
-            opt.dataset_len = len(dataset_test)
-            opt.test = 'test_1'
-            print(f"Test: {opt.test}")
-            for j, data_test in enumerate(dataset_test):
-                model.set_input(data_test)  # unpack data from data loader
-                model.test()  # run inference
 
             # --------------
             #  Log Progress
@@ -83,17 +73,22 @@ if __name__ == '__main__':
 
             # Print log
             model.print_current_loss(epoch, dataset_size, i, time_left)
-
         model.plot_current_losses(epoch, model.track_current_losses(), 'Loss_functions')
-        if epoch == 50 or epoch == 100 or epoch == 200:
+
+        ############################################################
+
+        if epoch == 50:
             model.save_networks(epoch)
+        if opt.texture_criterion == 'attention' and (epoch == 1 or epoch == 50):
+            model.save_attention_maps()
+            model.save_attention_weights()
 
         # ------
         #  Test
         # ------
         test_time = 0
         test_start = time.time()
-        if epoch == 50 or epoch == 100 or epoch == 200:
+        if epoch == 50:
             opt.serial_batches = True
             opt.batch_size = 1
             test_start = time.time()
@@ -107,8 +102,7 @@ if __name__ == '__main__':
                 model.set_input(data_test)  # unpack data from data loader
                 model.test()  # run inference
 
-            model.compute_FrechetInceptionDistance()
-            model.save_metrics(model.get_epoch_performance(), epoch)
+            model.save_metrics_per_patient(epoch)
             # ---------------------------------
             opt.dataset_len = len(dataset_test_2)
             opt.test = 'test_2'
@@ -117,8 +111,8 @@ if __name__ == '__main__':
                 model.set_input(data_test)  # unpack data from data loader
                 model.test()  # run inference
 
-            model.compute_FrechetInceptionDistance()
-            model.save_metrics(model.get_epoch_performance(), epoch)
+            model.fid_compute()
+            model.save_metrics_per_patient(epoch)
             # ---------------------------------
             opt.dataset_len = len(elcap_complete)
             opt.test = 'elcap_complete'
@@ -128,8 +122,8 @@ if __name__ == '__main__':
                 model.set_input(data_test)  # unpack data from data loader
                 model.test()  # run inference
 
-            model.compute_FrechetInceptionDistance()
-            model.save_metrics(model.get_epoch_performance(), epoch)
+            model.save_raps_per_patient(epoch)
+            model.save_metrics_per_patient(epoch)
             # ---------------------------------
             opt.dataset_len = len(dataset_test_3)
             opt.dataset_mode = "LIDC_IDRI"
@@ -139,8 +133,8 @@ if __name__ == '__main__':
                 model.set_input(data_test)  # unpack data from data loader
                 model.test()  # run inference
 
-            model.compute_FrechetInceptionDistance()
-            model.save_metrics(model.get_epoch_performance(), epoch)
+            model.save_raps_per_patient(epoch)
+            model.save_metrics_per_patient(epoch)
 
             opt.batch_size = 16
             opt.serial_batches = False

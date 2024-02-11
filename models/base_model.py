@@ -5,7 +5,7 @@ import torch
 from collections import OrderedDict
 from abc import ABC, abstractmethod
 from . import networks
-
+from data.storage import *
 
 
 class BaseModel(ABC):
@@ -57,6 +57,14 @@ class BaseModel(ABC):
         self.ssim = 0
         self.vif = 0
         self.metrics_eval = OrderedDict()
+
+        self.metrics_data_1 = dict()
+        self.metrics_data_2 = dict()
+        self.metrics_data_3 = dict()
+        self.raps_data_3 = dict()
+        self.metrics_data_4 = dict()
+        self.raps_data_4 = dict()
+
         self.metric = 0  # used for learning rate policy 'plateau'
         self.avg_metrics_test_1 = OrderedDict()
         self.avg_metrics_test_2 = OrderedDict()
@@ -97,7 +105,7 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    def test(self, idx):
+    def test(self):
         """run the model in inference mode.
         """
         pass
@@ -205,7 +213,6 @@ class BaseModel(ABC):
 
     ######
 
-
     def compute_visuals(self):
         """Calculate additional output images for visdom and HTML visualization"""
         pass
@@ -268,6 +275,37 @@ class BaseModel(ABC):
                 self.metrics_eval[name].append(
                     float(getattr(self, name)))  # float(...) works for both scalar tensor and float number
         return self.metrics_eval
+
+    def track_metrics_per_patient(self, id):
+        if self.opt.test == "test_1":
+            for name in self.metric_names:
+                if isinstance(name, str) and name != 'FID':
+                    self.metrics_data_1[id][name].append(
+                        float(getattr(self, name)))  # float(...) works for both scalar tensor and float number
+            return self.metrics_data_1
+        elif self.opt.test == "test_2":
+            for name in self.metric_names:
+                if isinstance(name, str) and name != 'FID':
+                    self.metrics_data_2[id][name].append(
+                        float(getattr(self, name)))  # float(...) works for both scalar tensor and float number
+            return self.metrics_data_2
+        elif self.opt.test == "test_3":
+            for name in self.metric_names:
+                if isinstance(name, str) and name != 'FID':
+                    self.metrics_data_3[id][name].append(
+                        float(getattr(self, name)))  # float(...) works for both scalar tensor and float number
+            self.raps_data_3[id]['raps'].append(list(getattr(self, 'raps')))
+            return self.metrics_data_3, self.raps_data_3
+
+        elif self.opt.test == "elcap_complete":
+            for name in self.metric_names:
+                if isinstance(name, str) and name != 'FID':
+                    self.metrics_data_4[id][name].append(
+                        float(getattr(self, name)))  # float(...) works for both scalar tensor and float number
+
+            self.raps_data_4[id]['raps'].append(list(getattr(self, 'raps')))
+
+            return self.metrics_data_4, self.raps_data_4
 
     def save_networks(self, epoch):
         """Save all the networks to the disk.
@@ -375,6 +413,7 @@ class BaseModel(ABC):
                 for key in list(state_dict.keys()):  # need to copy keys here because we mutate in loop
                     self.__patch_instance_norm_state_dict(state_dict, net, key.split('.'))
                 net.load_state_dict(state_dict)
+
     def print_networks(self, verbose):
         """Print the total number of parameters in the network and (if verbose) network architecture
 

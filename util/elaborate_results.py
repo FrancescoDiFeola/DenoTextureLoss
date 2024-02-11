@@ -135,53 +135,53 @@ if __name__ == '__main__':
     # RAPS (radially averaged-power spectrum)
 
     # baseline
-    profile_elcap_baseline = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_baseline_window_4/raps_elcap_complete_epoch50.json",
-                                                      path_2="metrics_pix2pix_baseline_window_5/raps_elcap_complete_epoch50.json",
-                                                      path_3="metrics_pix2pix_baseline_window_6/raps_elcap_complete_epoch50.json")
-    profile_test3_baseline = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_baseline_window_4/raps_test_3_epoch50.json",
-                                                      path_2="metrics_pix2pix_baseline_window_5/raps_test_3_epoch50.json",
-                                                      path_3="metrics_pix2pix_baseline_window_6/raps_test_3_epoch50.json")
+    profile_elcap_baseline = compute_average_profiles("/Volumes/sandisk/cycleGAN_results/metrics_ep50_cycleGAN", path_1="metrics_baseline_10/raps_elcap_complete_epoch70.json",
+                                                      path_2="metrics_baseline_11/raps_elcap_complete_epoch70.json",
+                                                      path_3="metrics_baseline_12/raps_elcap_complete_epoch70.json")
+    profile_test3_baseline = compute_average_profiles("/Volumes/sandisk/cycleGAN_results/metrics_ep50_cycleGAN", path_1="metrics_baseline_10/raps_test_3_epoch70.json",
+                                                      path_2="metrics_baseline_11/raps_test_3_epoch70.json",
+                                                      path_3="metrics_baseline_12/raps_test_3_epoch70.json")
 
     # texture max
-    profile_elcap_texture_max = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50",path_1="metrics_pix2pix_texture_max_window_4/raps_elcap_complete_epoch50.json",
-                                                      path_2="metrics_pix2pix_texture_max_window_5/raps_elcap_complete_epoch50.json",
-                                                      path_3="metrics_pix2pix_texture_max_window_6/raps_elcap_complete_epoch50.json")
+    profile_elcap_texture_max = compute_average_profiles("/Volumes/sandisk/cycleGAN_results/metrics_ep50_cycleGAN",path_1="metrics_texture_max_10/raps_elcap_complete_epoch70.json",
+                                                      path_2="metrics_texture_max_11/raps_elcap_complete_epoch70.json",
+                                                      path_3="metrics_texture_max_12/raps_elcap_complete_epoch70.json")
 
-    profile_test_3_texture_max = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50",path_1="metrics_pix2pix_texture_max_window_4/raps_test_3_epoch50.json",
-                                                      path_2="metrics_pix2pix_texture_max_window_5/raps_test_3_epoch50.json",
-                                                      path_3="metrics_pix2pix_texture_max_window_6/raps_test_3_epoch50.json")
+    profile_test_3_texture_max = compute_average_profiles("/Volumes/sandisk/cycleGAN_results/metrics_ep50_cycleGAN",path_1="metrics_texture_max_10/raps_test_3_epoch70.json",
+                                                      path_2="metrics_texture_max_11/raps_test_3_epoch70.json",
+                                                      path_3="metrics_texture_max_12/raps_test_3_epoch70.json")
     # texture avg
-    profile_elcap_texture_avg = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_texture_avg_window_4/raps_elcap_complete_epoch50.json",
-                                                         path_2="metrics_pix2pix_texture_avg_window_5/raps_elcap_complete_epoch50.json",
-                                                         path_3="metrics_pix2pix_texture_avg_window_6/raps_elcap_complete_epoch50.json")
+    profile_elcap_texture_avg = compute_average_profiles("/Volumes/sandisk/cycleGAN_results/metrics_ep50_cycleGAN", path_1="metrics_texture_avg_10/raps_elcap_complete_epoch70.json",
+                                                         path_2="metrics_texture_avg_11/raps_elcap_complete_epoch70.json",
+                                                         path_3="metrics_texture_avg_12/raps_elcap_complete_epoch70.json")
 
-    profile_test_3_texture_avg = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_texture_avg_window_4/raps_test_3_epoch50.json",
-                                                          path_2="metrics_pix2pix_texture_avg_window_5/raps_test_3_epoch50.json",
-                                                          path_3="metrics_pix2pix_texture_avg_window_6/raps_test_3_epoch50.json")
+    profile_test_3_texture_avg = compute_average_profiles("/Volumes/sandisk/cycleGAN_results/metrics_ep50_cycleGAN", path_1="metrics_texture_avg_10/raps_test_3_epoch70.json",
+                                                          path_2="metrics_texture_avg_11/raps_test_3_epoch70.json",
+                                                          path_3="metrics_texture_avg_12/raps_test_3_epoch70.json")
     # texture frobenius
-    profile_elcap_texture_Frob = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_texture_Frob_window_4/raps_elcap_complete_epoch50.json",
-                                                         path_2="metrics_pix2pix_texture_Frob_window_5/raps_elcap_complete_epoch50.json",
-                                                         path_3="metrics_pix2pix_texture_Frob_window_6/raps_elcap_complete_epoch50.json")
+    profile_elcap_texture_Frob = compute_average_profiles("/Volumes/sandisk/cycleGAN_results/metrics_ep50_cycleGAN", path_1="metrics_texture_Frob_10/raps_elcap_complete_epoch70.json",
+                                                         path_2="metrics_texture_Frob_11/raps_elcap_complete_epoch70.json",
+                                                         path_3="metrics_texture_Frob_12/raps_elcap_complete_epoch70.json")
 
-    profile_test_3_texture_Frob = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_texture_Frob_window_4/raps_test_3_epoch50.json",
-                                                          path_2="metrics_pix2pix_texture_Frob_window_5/raps_test_3_epoch50.json",
-                                                          path_3="metrics_pix2pix_texture_Frob_window_6/raps_test_3_epoch50.json")
+    profile_test_3_texture_Frob = compute_average_profiles("/Volumes/sandisk/cycleGAN_results/metrics_ep50_cycleGAN", path_1="metrics_texture_Frob_10/raps_test_3_epoch70.json",
+                                                          path_2="metrics_texture_Frob_11/raps_test_3_epoch70.json",
+                                                          path_3="metrics_texture_Frob_12/raps_test_3_epoch70.json")
     # texture attention
-    profile_elcap_texture_att = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_texture_att_window_13/raps_elcap_complete_epoch50.json",
-                                                         path_2="metrics_pix2pix_texture_att_window_14/raps_elcap_complete_epoch50.json",
-                                                         path_3="metrics_pix2pix_texture_att_window_15/raps_elcap_complete_epoch50.json")
+    profile_elcap_texture_att = compute_average_profiles("/Volumes/sandisk/cycleGAN_results/metrics_ep50_cycleGAN", path_1="metrics_texture_att_13/raps_elcap_complete_epoch70.json",
+                                                         path_2="metrics_texture_att_14/raps_elcap_complete_epoch70.json",
+                                                         path_3="metrics_texture_att_15/raps_elcap_complete_epoch70.json")
 
-    profile_test_3_texture_att = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_texture_att_window_13/raps_test_3_epoch50.json",
-                                                          path_2="metrics_pix2pix_texture_att_window_14/raps_test_3_epoch50.json",
-                                                          path_3="metrics_pix2pix_texture_att_window_15/raps_test_3_epoch50.json")
+    profile_test_3_texture_att = compute_average_profiles("/Volumes/sandisk/cycleGAN_results/metrics_ep50_cycleGAN", path_1="metrics_texture_att_13/raps_test_3_epoch70.json",
+                                                          path_2="metrics_texture_att_14/raps_test_3_epoch70.json",
+                                                          path_3="metrics_texture_att_15/raps_test_3_epoch70.json")
     # perceptual
-    profile_elcap_perceptual = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_perceptual_window_4/raps_elcap_complete_epoch50.json",
-                                                         path_2="metrics_pix2pix_perceptual_window_5/raps_elcap_complete_epoch50.json",
-                                                         path_3="metrics_pix2pix_perceptual_window_6/raps_elcap_complete_epoch50.json")
+    profile_elcap_perceptual = compute_average_profiles("/Volumes/sandisk/cycleGAN_results/metrics_ep50_cycleGAN", path_1="metrics_perceptual_10/raps_elcap_complete_epoch70.json",
+                                                         path_2="metrics_perceptual_11/raps_elcap_complete_epoch70.json",
+                                                         path_3="metrics_perceptual_12/raps_elcap_complete_epoch70.json")
 
-    profile_test_3_perceptual = compute_average_profiles("/Volumes/sandisk/pix2pix_results/raps_ep50", path_1="metrics_pix2pix_perceptual_window_4/raps_test_3_epoch50.json",
-                                                          path_2="metrics_pix2pix_perceptual_window_5/raps_test_3_epoch50.json",
-                                                          path_3="metrics_pix2pix_perceptual_window_6/raps_test_3_epoch50.json")
+    profile_test_3_perceptual = compute_average_profiles("/Volumes/sandisk/cycleGAN_results/metrics_ep50_cycleGAN", path_1="metrics_perceptual_10/raps_test_3_epoch70.json",
+                                                          path_2="metrics_perceptual_11/raps_test_3_epoch70.json",
+                                                          path_3="metrics_perceptual_12/raps_test_3_epoch70.json")
 
 
     '''for i in range(0, 7, 1):

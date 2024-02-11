@@ -1,7 +1,6 @@
 import os
 from data.base_dataset import BaseDataset, get_transform
-from data.image_folder import make_dataset
-from PIL import Image
+from options.train_options import TrainOptions
 import random
 import pandas as pd
 import pydicom
@@ -42,7 +41,7 @@ class MayoDataset(BaseDataset):
         parser.add_argument('--window_center', type=int, default=-500,
                             help='It specifies the center of the selected HU window')
         parser.add_argument('--plot_verbose', help="Plot images.", type=bool, default=False)
-
+        parser.add_argument('--emphysema', help="If I am working with SCAPIS.", type=bool, default=False)
         return parser
 
     @staticmethod
@@ -89,9 +88,9 @@ class MayoDataset(BaseDataset):
         BaseDataset.__init__(self, opt)
         annotations = self.opt.text_file
         annotations_df = pd.read_csv(annotations)
-        self.annotations_A = annotations_df.loc[annotations_df['domain'] == 'LD'].reset_index(drop=True)
+        self.annotations_A = annotations_df.loc[annotations_df['domain'] == self.opt.source].reset_index(drop=True)
         # self.annotations_A = annotations_A.sort_values(by=['partial_path'])
-        self.annotations_B = annotations_df.loc[annotations_df['domain'] == 'HD'].reset_index(drop=True)
+        self.annotations_B = annotations_df.loc[annotations_df['domain'] == self.opt.target].reset_index(drop=True)
         # self.annotations_B = annotations_B.sort_values(by=['partial_path'])
         self.window_width = opt.window_width
         self.window_center = opt.window_center
@@ -115,13 +114,15 @@ class MayoDataset(BaseDataset):
         """
         index_A = index % self.A_size
         A_path = self.annotations_A['path_slice'].iloc[index_A]  # make sure index is within the range
-        if self.opt.model == 'pix2pix' or self.opt.serial_batches:  # make sure index is within then range
+        id = self.annotations_B['patient'].iloc[index_A]
+        if self.opt.model == 'pix2pix' or self.opt.model == "redcnn" or self.opt.serial_batches:  # make sure index is within then range
             index_B = index_A
         else:  # randomize the index for domain B to avoidse fixed pairs.
             index_B = random.randint(0, self.B_size - 1)
         B_path = self.annotations_B['path_slice'].iloc[index_B]
         A_img = pydicom.dcmread(A_path)
         B_img = pydicom.dcmread(B_path)
+
         # apply image transformation
         A = self.transforms(A_img)
         B = self.transforms(B_img)
@@ -131,7 +132,8 @@ class MayoDataset(BaseDataset):
             self.plot_img(B, pname='HD')
             print(A_path)
             print(B_path)
-        return {'A': A, 'B': B, 'A_paths': A_path, 'B_paths': B_path}
+
+        return {'A': A, 'B': B, 'A_paths': A_path, 'B_paths': B_path, "patient": id}
 
     def __len__(self):
         """Return the total number of images in the dataset.
@@ -150,21 +152,35 @@ class MayoDataset(BaseDataset):
 
         return img_w
 
+    def window_norm(self, x):
+        img_min = self.window_center - self.window_width // 2
+        img_max = self.window_center + self.window_width // 2
+        newimg = 2*((x - img_min) / (img_max - img_min))-1
+        newimg[newimg < -1] = -1
+        newimg[newimg > 1] = 1
+        return newimg  # 2*newimg - 1
+
     def transforms(self, dicom, tensor_output=True):
         x = self.convert_in_hu(dicom)
 
-        if self.opt.windowing == False:
+        if not self.opt.windowing:
             x = np.clip(x, -1024, 3071)
+            x = self.normalize_img(x)
+            x = cv2.resize(x, (self.opt.load_size, self.opt.load_size))
+        elif self.opt.emphysema:
+            x = self.window_norm(x)
+            x = cv2.resize(x, (self.opt.load_size, self.opt.load_size))
         else:
             x = self.window_image(x)
+            x = self.normalize_img(x)
+            x = cv2.resize(x, (self.opt.load_size, self.opt.load_size))
 
-        x = self.normalize_img(x)
-        x = cv2.resize(x, (self.opt.load_size, self.opt.load_size))
         if tensor_output:
             x = torch.from_numpy(x)
             x = x.unsqueeze(dim=0)
             return x.float()
         else:
             return x.astype('float32')
+
 
 
