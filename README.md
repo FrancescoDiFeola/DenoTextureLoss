@@ -5,7 +5,8 @@
 
 # MSTLF: Multi Scale Texture Loss Function
 
-<img width="969" alt="Screenshot 2024-02-23 at 12 25 19" src="https://github.com/FrancescoDiFeola/DenoTextureLoss/assets/114158160/e3f55c9f-1672-442d-9c02-755314d69c72">
+<img width="811" alt="Screenshot 2024-02-23 at 12 28 55" src="https://github.com/FrancescoDiFeola/DenoTextureLoss/assets/114158160/bb52661c-d798-4e56-b482-5815634a3ff7">
+
 
 
 Overall framework of MSTLF. (a) MSTLF mainly includes two essential components, i.e., Multi-Scale Texture Extractor (MSTE) and Aggregation Module (AM). (b) MSTE module and (c) dynamic aggregation by self attention mechanism.
