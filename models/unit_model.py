@@ -21,12 +21,35 @@ from loss_functions.texture_loss import texture_loss
 from metrics.mse_psnr_ssim_vif import *
 from models.networks import init_net
 from piq import brisque
-
+import matplotlib.patches as patches
+from torchmetrics.functional.image import image_gradients
 
 def compute_kl(mu):
     mu_2 = torch.pow(mu, 2)
     loss = torch.mean(mu_2)
     return loss
+
+
+def save_fig_to_pdf(img, idx, tag, bbox):
+    image_array = img.cpu().numpy()  # Assuming image_tensor is a PyTorch tensor
+
+    # Create a figure without axis
+    fig, ax = plt.subplots()
+    ax.axis('off')  # Turn off axis labels and ticks
+
+    # Plot the image
+    ax.imshow(image_array[0, 0, :, :], cmap='gray')
+
+    if bbox:
+        # Create a rectangle patch
+        rect = patches.Rectangle((100, 148), 50, 50, linewidth=1, edgecolor='r', facecolor='none')  # test 2: 158, test 3,4: 148
+
+        # Add the rectangle to the plot
+        ax.add_patch(rect)
+    # plt.show()
+    # Save the figure as a PDF without axis
+    plt.savefig(f'{tag}_{idx}.pdf', format='pdf', bbox_inches='tight', pad_inches=0, transparent=True)
+    plt.close()  # Close the figure to free up memory
 
 
 class UNITModel(BaseModel):
@@ -137,7 +160,6 @@ class UNITModel(BaseModel):
 
         # dictionary to store metrics per patient
 
-
         # metrics initialization
         self.fid_object = GANMetrics('cpu', detector_name='inceptionv3', batch_size=64)
         self.real_test_buffer = []
@@ -170,7 +192,7 @@ class UNITModel(BaseModel):
         """
         if self.opt.dataset_mode == "LIDC_IDRI":
             self.X1 = input['img'].type(self.Tensor).expand(-1, 3, -1, -1).to(self.device)
-            self.image_paths = input['im_paths']
+            self.id = input['patient'][0]
         else:
             # Set model input
             self.X1 = input["A"].type(self.Tensor).expand(-1, 3, -1, -1).to(self.device)
@@ -188,7 +210,6 @@ class UNITModel(BaseModel):
         # Get shared latent representation
         self.mu1, self.Z1 = self.E1(self.X1)
         self.mu2, self.Z2 = self.E2(self.X2)
-
 
         # Reconstruct images
         self.recon_X1 = self.G1(self.Z1)
@@ -211,6 +232,18 @@ class UNITModel(BaseModel):
             self.compute_metrics()
             self.track_metrics()
             print(self.fake_X2.shape)
+
+    def test_visuals(self, iter, list_index):
+
+        with torch.no_grad():
+            if iter in list_index:
+                _, self.Z1 = self.E1(self.X1)
+                self.fake_X2 = self.G2(self.Z1)
+                grad_fake_X2_x, grad_fake_X2_y = image_gradients(self.fake_X2.cpu())
+                grad_fake_B = torch.sqrt(grad_fake_X2_x ** 2 + grad_fake_X2_y ** 2)
+                save_fig_to_pdf(self.fake_X2, iter, self.opt.experiment_name, False)
+                save_fig_to_pdf(grad_fake_B, iter, f"grad_{self.opt.experiment_name}", True)
+                save_fig_to_pdf(grad_fake_B[:, :, 148:198, 100:150], iter, f"zoom_{self.opt.experiment_name}", False)  # test 2: 158:208, test 3,4: 148:198
 
     def backwark_encoderGen(self):
         self.loss_GAN_1 = self.opt.lambda_0 * self.criterion_GAN(self.D1(self.fake_X1), self.valid)
@@ -375,6 +408,7 @@ class UNITModel(BaseModel):
         torch.save(self.G2.state_dict(), f"{self.save_dir}/G2_ep{epoch}_{self.opt.experiment_name}.pth")
         torch.save(self.D1.state_dict(), f"{self.save_dir}/D1_ep{epoch}_{self.opt.experiment_name}.pth")
         torch.save(self.D2.state_dict(), f"{self.save_dir}/D2_ep{epoch}_{self.opt.experiment_name}.pth")
+
     def setup1(self, opt):
         """Load and print networks; create schedulers
 
@@ -383,6 +417,49 @@ class UNITModel(BaseModel):
         """
         self.load_networks_1(opt.epoch, opt.experiment_name)
         # self.print_networks(opt.verbose)
+
+    def setup2(self, opt, custom_dir):
+        """Load and print networks; create schedulers
+
+        Parameters:
+            opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
+        """
+        if self.isTrain:
+            self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
+        if not self.isTrain or opt.continue_train:
+            self.load_networks_2(opt.epoch, opt.experiment_name, custom_dir)
+        # self.print_networks(opt.verbose)
+
+    def load_networks_2(self,epoch, exp, custom_dir):
+        """Load all the networks from the disk.
+
+        Parameters:
+            epoch (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
+        """
+        for name in self.model_names:
+            if isinstance(name, str):
+                load_filename = 'net_%s_ep%s_%s.pth' % (name, epoch, exp)
+                load_path = os.path.join(custom_dir, load_filename)
+                net = getattr(self, name)
+                print('loading the model from %s' % load_path)
+                # if you are using PyTorch newer than 0.4 (e.g., built from
+                # GitHub source), you can remove str() on self.device
+                state_dict = torch.load(load_path, map_location=str(self.device))
+                print(state_dict.keys())
+                new_state_dict = {}
+                for key, value in state_dict.items():
+                    # Remove the specific word or prefix you want to eliminate
+                    new_key = key.replace('module.', '')
+                    new_state_dict[new_key] = value
+                print(new_state_dict.keys())
+
+                # if hasattr(state_dict, '_metadata'):
+                #    del new_state_dict._metadata
+
+                """# patch InstanceNorm checkpoints prior to 0.4
+                for key in list(state_dict.keys()):  # need to copy keys here because we mutate in loop
+                    self.__patch_instance_norm_state_dict(state_dict, net, key.split('.'))"""
+                net.load_state_dict(new_state_dict)
 
     def load_networks_1(self, epoch, exp):
         """Load all the networks from the disk.
@@ -416,6 +493,7 @@ class UNITModel(BaseModel):
                 for key in list(state_dict.keys()):  # need to copy keys here because we mutate in loop
                     self.__patch_instance_norm_state_dict(state_dict, net, key.split('.'))"""
                 net.load_state_dict(new_state_dict)
+
     def compute_metrics(self):
         if self.opt.dataset_mode == "LIDC_IDRI":
             # NIQE

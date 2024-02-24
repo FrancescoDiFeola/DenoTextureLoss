@@ -399,7 +399,7 @@ class BaseModel(ABC):
             if isinstance(name, str):
                 load_filename = '%s_net_%s_%s.pth' % (epoch, name, exp)
                 load_path = os.path.join(custom_dir, load_filename)
-                net = getattr(self, 'net' + name)
+                net = getattr(self, name)
                 if isinstance(net, torch.nn.DataParallel):
                     net = net.module
                 print('loading the model from %s' % load_path)

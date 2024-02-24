@@ -29,7 +29,7 @@ rc('text', usetex=True)
 # ------------------------------------------------------------------- #
 # ------------------------------------------------------------------- #
 # PERCEPTION-DISTORTION PLOT
-"""plt.figure(figsize=(column_width_inches, column_width_inches / aspect_ratio))
+plt.figure(figsize=(column_width_inches, column_width_inches / aspect_ratio))
 
 # plt.scatter([31.9714, 31.8105, 31.8427, 32.1373, 31.8319], [0.9626, 0.9594, 0.9580, 0.9614, 0.9588], marker='o')
 mse_pix2pix = [0.02252, 0.01050, 0.01050, 0.01032, 0.01042, 0.01162, 0.01041, 0.01055, 0.01037, 0.01063]
@@ -55,13 +55,13 @@ piqe_cycleGAN = [23.54948, 12.68929, 11.93226, 10.97366, 11.12554, 5.44317, 13.3
 
 mse_unit = [0.02252, 0.00885, 0.00732, 0.00770, 0.00741, 0.00739, 0.00854, 0.00768, 0.00764, 0.00783]
 niqe_unit = [17.02715, 6.45745, 6.84344, 6.75063, 7.16556, 6.02491, 6.50301, 7.25239, 7.41838, 6.68971]
-piqe_unit = [23.54948, 8.30951, 7.56712, 7.88673, 7.78715, 7.41100, 7.79082, 7.63876, 7.56228, 7.22717]
+piqe_unit = [23.54948, 8.31790, 7.5657, 7.88673, 7.78715, 7.41100, 7.79082, 7.63876, 7.56228, 7.22717]
 # fid_imnet_unit = [80.31756, 66.08463, 54.15049, 57.00600, 56.91359, 55.71386, 57.22355]
 # fid_random_unit = [115.85072, 84.50406,  66.93555, 70.92612, 71.06563, 70.40341, 71.40135]
 
 plt.scatter(mse_pix2pix[1:], piqe_pix2pix[1:], marker='o', color='orange')
 plt.scatter(mse_cycleGAN[1:], piqe_cycleGAN[1:], marker='o', color='red')
-plt.scatter(mse_unit[1:], piqe_unit[1:], marker='o', color='blue')"""
+plt.scatter(mse_unit[1:], piqe_unit[1:], marker='o', color='blue')
 
 # plt.annotate('LD', (mse_pix2pix[0], niqe_pix2pix[0]))
 """plt.annotate('Baseline', (mse_pix2pix[1], niqe_pix2pix[1]+0.26), fontsize=12)
@@ -122,7 +122,7 @@ plt.annotate('EDGE', (mse_unit[9]+0.0003, piqe_unit[9]-0.4), fontsize=12, ha='ri
 # plt.ylim([0.925, 1.02])
 plt.legend(['Pix2Pix', 'CycleGAN', 'UNIT'])
 plt.xlim([0.006, 0.012])
-plt.ylabel("PIQE")
+plt.ylabel("PIQUE")
 plt.xlabel("MSE")
 plt.tight_layout()
 # plt.title('Perception-distorsion evaluation', fontsize=9)
@@ -236,12 +236,10 @@ profile_test_2_low_dose = raps_ld
 # raps_ld = json.load(raps_ld)
 # profile_elcap_low_dose = element_wise_average2([raps_ld])
 
-
 # Test 3 (LIDC/IDRI) low-dose profile
 # raps_ld = open(f'/Volumes/Untitled/results_per_patient/metrics_low_dose_reference/raps_test_3_ld.json')
 # raps_ld = json.load(raps_ld)
 # profile_test_3_low_dose = element_wise_average2([raps_ld])
-
 
 # Test 2
 py.semilogy(profile_test_2_baseline)
@@ -298,7 +296,7 @@ py.show()"""
 # Template Matching
 
 def kernel_density_estimate(d):  # , img3
-    # sns.kdeplot(d["baseline"]["hd"], color='#33a02c')
+    sns.kdeplot(d["baseline"]["hd"], color='#40E0D0')
     sns.kdeplot(d["baseline"]["ld"], color='#e41a1c')
     sns.kdeplot(d["baseline"]["deno"], color='#1f78b4')
     sns.kdeplot(d["perceptual"]["deno"], color='#ff7f00')
@@ -318,21 +316,21 @@ def kernel_density_estimate(d):  # , img3
     # sns.kdeplot(data2, shade=True, color='red')
     # sns.histplot(data3, color='orange')
     # Customize the plot
-    plt.legend(["LDCT", "baseline", "VGG-16", "AE-CT", "SSIM", "EDGE", "MSTLF-max", "MSTLF-average", "MSLTF-Frobenius", "MSTLF-attention"], fontsize=15)
+    plt.legend(["LDCT", "Baseline", "VGG-16", "AE-CT", "SSIM", "EDGE", "MSTLF-max", "MSTLF-average", "MSLTF-Frobenius", "MSTLF-attention"], fontsize=15)
     # plt.title("Kernel Density Estimate (KDE) Plot (Test set 4, UNIT)")
-    plt.ylim(0, 75)
-    plt.xlim(0.875, 1.01)
+    plt.ylim(0, 25)
+    plt.xlim(0.875, 1.025)
     plt.xlabel("Value")
     plt.ylabel("Density")
     plt.tight_layout()
-    plt.savefig('/Users/francescodifeola/Desktop/UNIT_test_4_tm.pdf', format='pdf')
+    plt.savefig('/Users/francescodifeola/Desktop/pix2pix_test_4_tm.pdf', format='pdf')
     # Display the plot
     plt.show()
 
 
 # Plot template matching KDE
-model = "cycleGAN"
-data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/metrics_baseline_1/tm_elcap_complete_epoch50")
+# model = "cycleGAN"
+"""data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/metrics_baseline_1/tm_elcap_complete_epoch50")
 data2 = load_from_json(f"/Volumes/Untitled/results_per_patient/metrics_baseline_2/tm_elcap_complete_epoch50")
 data3 = load_from_json(f"/Volumes/Untitled/results_per_patient/metrics_baseline_3/tm_elcap_complete_epoch50")
 data4 = load_from_json(f"/Volumes/Untitled/results_per_patient/metrics_perceptual_1/tm_elcap_complete_epoch50")
@@ -358,7 +356,63 @@ data23 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_ssi
 data24 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_ssim_3/tm_elcap_complete_epoch50")
 data25 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_edge_1/tm_elcap_complete_epoch50")
 data26 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_edge_2/tm_elcap_complete_epoch50")
-data27 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_edge_3/tm_elcap_complete_epoch50")
+data27 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_edge_3/tm_elcap_complete_epoch50")"""
+
+data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_baseline_tm_1/tm_elcap_complete_epoch50")
+data2 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_baseline_tm_2/tm_elcap_complete_epoch50")
+data3 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_baseline_tm_3/tm_elcap_complete_epoch50")
+data4 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_perceptual_tm_1/tm_elcap_complete_epoch50")
+data5 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_perceptual_tm_2/tm_elcap_complete_epoch50")
+data6 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_perceptual_tm_3/tm_elcap_complete_epoch50")
+data7 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_max_tm_1/tm_elcap_complete_epoch50")
+data8 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_max_tm_2/tm_elcap_complete_epoch50")
+data9 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_max_tm_3/tm_elcap_complete_epoch50")
+data10 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_avg_tm_1/tm_elcap_complete_epoch50")
+data11 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_avg_tm_2/tm_elcap_complete_epoch50")
+data12 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_avg_tm_3/tm_elcap_complete_epoch50")
+data13 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_Frob_tm_1/tm_elcap_complete_epoch50")
+data14 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_Frob_tm_2/tm_elcap_complete_epoch50")
+data15 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_Frob_tm_3/tm_elcap_complete_epoch50")
+data16 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_att_tm_1/tm_elcap_complete_epoch50")
+data17 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_att_tm_2/tm_elcap_complete_epoch50")
+data18 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_att_tm_3/tm_elcap_complete_epoch50")
+data19 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metric_pix2pix_autoencoder_1/tm_elcap_complete_epoch50")
+data20 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metric_pix2pix_autoencoder_2/tm_elcap_complete_epoch50")
+data21 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metric_pix2pix_autoencoder_3/tm_elcap_complete_epoch50")
+data22 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metric_pix2pix_ssim_1/tm_elcap_complete_epoch50")
+data23 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metric_pix2pix_ssim_1/tm_elcap_complete_epoch50")
+data24 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metric_pix2pix_ssim_1/tm_elcap_complete_epoch50")
+data25 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metric_pix2pix_edge_1/tm_elcap_complete_epoch50")
+data26 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metric_pix2pix_edge_2/tm_elcap_complete_epoch50")
+data27 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metric_pix2pix_edge_3/tm_elcap_complete_epoch50")
+
+"""data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_baseline_tm_1/tm_elcap_complete_epoch50")
+data2 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_baseline_tm_2/tm_elcap_complete_epoch50")
+data3 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_baseline_tm_3/tm_elcap_complete_epoch50")
+data4 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_perceptual_tm_4/tm_elcap_complete_epoch50")
+data5 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_perceptual_tm_5/tm_elcap_complete_epoch50")
+data6 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_perceptual_tm_6/tm_elcap_complete_epoch50")
+data7 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_texture_max_tm_1/tm_elcap_complete_epoch50")
+data8 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_texture_max_tm_2/tm_elcap_complete_epoch50")
+data9 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_texture_max_tm_3/tm_elcap_complete_epoch50")
+data10 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_texture_avg_tm_1/tm_elcap_complete_epoch50")
+data11 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_texture_avg_tm_2/tm_elcap_complete_epoch50")
+data12 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_texture_avg_tm_3/tm_elcap_complete_epoch50")
+data13 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_texture_Frob_tm_1/tm_elcap_complete_epoch50")
+data14 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_texture_Frob_tm_2/tm_elcap_complete_epoch50")
+data15 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_texture_Frob_tm_3/tm_elcap_complete_epoch50")
+data16 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_texture_att_tm_1/tm_elcap_complete_epoch50")
+data17 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_texture_att_tm_2/tm_elcap_complete_epoch50")
+data18 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_texture_att_tm_3/tm_elcap_complete_epoch50")
+data19 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_autoencoder_1/tm_elcap_complete_epoch50")
+data20 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_autoencoder_2/tm_elcap_complete_epoch50")
+data21 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_autoencoder_3/tm_elcap_complete_epoch50")
+data22 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_ssim_1/tm_elcap_complete_epoch50")
+data23 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_ssim_1/tm_elcap_complete_epoch50")
+data24 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_ssim_1/tm_elcap_complete_epoch50")
+data25 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_edge_1/tm_elcap_complete_epoch50")
+data26 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_edge_2/tm_elcap_complete_epoch50")
+data27 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_edge_3/tm_elcap_complete_epoch50")"""
 
 d_ = {"baseline": {"deno": [], "hd": [], "ld": []},
       "texture_max": {"deno": [], "hd": [], "ld": []},

@@ -143,7 +143,7 @@ class Generator(nn.Module):
 
 
 class Generator_AdaIn(nn.Module):
-    def __init__(self, out_channels=3, dim=64, n_upsample=2, shared_block=None):
+    def __init__(self, out_channels=1, dim=64, n_upsample=2, shared_block=None):
         super(Generator_AdaIn, self).__init__()
 
         self.shared_block = shared_block

@@ -1,7 +1,5 @@
 import itertools
-
 import matplotlib.pyplot as plt
-
 from util.image_pool import ImagePool
 from util.util import *
 from .base_model import BaseModel, OrderedDict
@@ -38,6 +36,29 @@ from piq import SSIMLoss
 from metrics.piqe import *
 from models.autoencoder_perceptual import *
 from loss_functions.kl_divergence import *
+import matplotlib.patches as patches
+
+
+def save_fig_to_pdf(img, idx, tag, bbox):
+    image_array = img.cpu().numpy()  # Assuming image_tensor is a PyTorch tensor
+
+    # Create a figure without axis
+    fig, ax = plt.subplots()
+    ax.axis('off')  # Turn off axis labels and ticks
+
+    # Plot the image
+    ax.imshow(image_array[0, 0, :, :], cmap='gray')
+
+    if bbox:
+        # Create a rectangle patch
+        rect = patches.Rectangle((100, 148), 50, 50, linewidth=1, edgecolor='r', facecolor='none') # test 2: 158, test 3,4: 148
+
+        # Add the rectangle to the plot
+        ax.add_patch(rect)
+    # plt.show()
+    # Save the figure as a PDF without axis
+    plt.savefig(f'{tag}_{idx}.pdf', format='pdf', bbox_inches='tight', pad_inches=0, transparent=True)
+    plt.close()  # Close the figure to free up memory
 
 
 # Function to add a patient to the dictionary
@@ -402,6 +423,17 @@ class CycleGANModel(BaseModel):
 
             self.track_metrics_per_patient(self.id)
 
+    def test_visuals(self, iter, list_index):
+
+        with torch.no_grad():
+            if iter in list_index:
+                self.fake_B = self.netG_A(self.real_A)
+                grad_fake_B_x, grad_fake_B_y = image_gradients(self.fake_B.cpu())
+                grad_fake_B = torch.sqrt(grad_fake_B_x ** 2 + grad_fake_B_y ** 2)
+                save_fig_to_pdf(self.fake_B, iter, self.opt.experiment_name, False)
+                # save_fig_in_pdf(grad_fake_B, iter, self.opt.experiment_name, True)
+                # save_fig_in_pdf(grad_fake_B[:, :, 148:198, 100:150], iter, f"zoom_{self.opt.experiment_name}", False)  # test 2: 158:208, test 3,4: 148:198
+
     def test2(self, iter):
 
         with torch.no_grad():
@@ -568,19 +600,6 @@ class CycleGANModel(BaseModel):
             self.brisque = 0
             # VIF
             self.vif = vif(x, y)
-
-    """def compute_fid(self, idx):
-        with torch.no_grad():
-            if idx == self.opt.dataset_len - 1:
-                self.real_test_buffer = torch.cat(self.real_test_buffer).to("cuda:1")
-                self.fake_test_buffer = torch.cat(self.fake_test_buffer).to("cuda:1")
-                fid_index = calculate_frechet(self.real_test_buffer, self.fake_test_buffer, self.inception_model)
-                self.metrics_eval['FID'].append(fid_index)
-                self.real_test_buffer = []
-                self.fake_test_buffer = []
-                print(f"list: {self.real_test_buffer}")
-            else:
-                pass"""
 
     def backward_D_basic(self, netD, real, fake):
         """Calculate GAN loss for the discriminator

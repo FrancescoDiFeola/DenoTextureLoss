@@ -23,7 +23,28 @@ import time
 from loss_functions.edge_loss import *
 from piq import SSIMLoss
 from models.autoencoder_perceptual import *
+import matplotlib.patches as patches
 
+def save_fig_in_pdf(img, idx, tag, bbox):
+    image_array = img.cpu().numpy()  # Assuming image_tensor is a PyTorch tensor
+
+    # Create a figure without axis
+    fig, ax = plt.subplots()
+    ax.axis('off')  # Turn off axis labels and ticks
+
+    # Plot the image
+    ax.imshow(image_array[0, 0, :, :], cmap='gray')
+
+    if bbox:
+        # Create a rectangle patch
+        rect = patches.Rectangle((100, 158), 50, 50, linewidth=1, edgecolor='r', facecolor='none') # test 2: 158, test 3,4: 148
+
+        # Add the rectangle to the plot
+        ax.add_patch(rect)
+    # plt.show()
+    # Save the figure as a PDF without axis
+    plt.savefig(f'{tag}_{idx}.pdf', format='pdf', bbox_inches='tight', pad_inches=0, transparent=True)
+    plt.close()  # Close the figure to free up memory
 
 # Function to add a patient to the dictionary
 def add_patient(data, patient_id, other_patient_fields=None):
@@ -345,6 +366,17 @@ class Pix2PixModel(BaseModel):
             self.compute_metrics()
 
             self.track_metrics_per_patient(self.id)
+
+    def test_visuals(self, iter, list_index):
+
+        with torch.no_grad():
+            if iter in list_index:
+                self.fake_B = self.netG(self.real_A)
+                grad_fake_B_x, grad_fake_B_y = image_gradients(self.fake_B.cpu())
+                grad_fake_B = torch.sqrt(grad_fake_B_x ** 2 + grad_fake_B_y ** 2)
+                save_fig_in_pdf(self.fake_B, iter, self.opt.experiment_name, False)
+                save_fig_in_pdf(grad_fake_B, iter, f"grad_{self.opt.experiment_name}", True)
+                save_fig_in_pdf(grad_fake_B[:, :, 158:208, 100:150], iter, f"zoom_{self.opt.experiment_name}", False)  # test 2: 158:208, test 3,4: 148:198
 
     def test2(self, iter):
 
