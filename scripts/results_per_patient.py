@@ -20,11 +20,16 @@ def calculate_patient_averages(data):
         patient_metrics = {}
 
         for metric, values in metrics.items():
+<<<<<<< HEAD
             if metric.find("FID") != -1:
                 continue
             else:
                 metric_average = sum(values) / len(values) if values else 0
                 patient_metrics[metric] = metric_average
+=======
+            metric_average = sum(values) / len(values) if values else 0
+            patient_metrics[metric] = metric_average
+>>>>>>> origin/main
 
         patient_averages[patient_id] = patient_metrics
 
@@ -82,9 +87,21 @@ def compute_wilcoxon_test(set_1, set_2, criterion):
 
 if __name__ == "__main__":
     from itertools import product
+<<<<<<< HEAD
     experiments_pix2pix = [
                            "metrics_texture_avg_diff0001",
                            "metrics_baseline_s_",
+=======
+    experiments_pix2pix = ["metrics_pix2pix_texture_att_diff_unpaired",
+                           "metrics_pix2pix_texture_max_diff_unpaired",
+                           "metrics_pix2pix_texture_Frob_diff_unpaired",
+                           "metrics_pix2pix_texture_avg_diff_unpaired",
+                           "metrics_pix2pix_perceptual_unpaired",
+                           "metrics_pix2pix_baseline_diff_unpaired",
+                           "metric_pix2pix_ssim",
+                           "metric_pix2pix_autoencoder",
+                           "metric_pix2pix_edge",
+>>>>>>> origin/main
                            # "metrics_pix2pix_texture_att_diff_piqe",
                            # "metrics_pix2pix_perceptual_piqe",
                            # "metrics_pix2pix_baseline_diff_piqe",
@@ -104,6 +121,7 @@ if __name__ == "__main__":
         "metrics_ssim",
         "metrics_autoencoder",
     ]
+<<<<<<< HEAD
     comparisons = list(product(experiments_pix2pix, experiments_pix2pix))
 
     # /Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_att_diff_unpaired_1/metrics_{test_name}_epoch50
@@ -112,6 +130,15 @@ if __name__ == "__main__":
         data = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_baseline_s_4/metrics_{test_name}_epoch50")
         data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_baseline_s_5/metrics_{test_name}_epoch50")
         data2 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_baseline_s_6/metrics_{test_name}_epoch50")
+=======
+    comparisons = list(product(experiments_unit, experiments_unit))
+    """  # /Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_att_diff_unpaired_1/metrics_{test_name}_epoch50
+    # Per patient average metrics
+    for test_name in ['test_2', 'test_3', 'elcap_complete']:  # , 'test_2', 'test_3', 'elcap_complete'
+        data = load_from_json(f"/Volumes/sandisk/cycleGAN_emphysema/metrics_baseline_9pat_LUNAhwind_1/metrics_{test_name}_epoch50")
+        data1 = load_from_json(f"/Volumes/sandisk/cycleGAN_emphysema/metrics_baseline_9pat_LUNAhwind_1/metrics_{test_name}_epoch50")
+        data2 = load_from_json(f"/Volumes/sandisk/cycleGAN_emphysema/metrics_baseline_9pat_LUNAhwind_1/metrics_{test_name}_epoch50")
+>>>>>>> origin/main
 
         # compute the average for each patient in each experiment
         patient_averages_data = calculate_patient_averages(data)
@@ -127,17 +154,30 @@ if __name__ == "__main__":
 
         # compute the overall average by averaging over the patients
         averaged_metrics, _ = calculate_average_metrics(average_of_averages)
+<<<<<<< HEAD
         print(f"Overall average between 3 experiments {test_name}: {averaged_metrics}")
+=======
+        print(f"Overall average between 3 experiments {test_name}: {averaged_metrics}")"""
+>>>>>>> origin/main
 
     # Wilcoxon test
     for i in comparisons:
         for test_name in ['test_2', 'test_3', 'elcap_complete']:  # , 'test_2', 'test_3', 'elcap_complete'
+<<<<<<< HEAD
             data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/{i[0]}_1/metrics_{test_name}_epoch50")
             data2 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/{i[0]}_2/metrics_{test_name}_epoch50")
             data3 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/{i[0]}_3/metrics_{test_name}_epoch50")
             data4 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/{i[1]}_1/metrics_{test_name}_epoch50")
             data5 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/{i[1]}_2/metrics_{test_name}_epoch50")
             data6 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/{i[1]}_3/metrics_{test_name}_epoch50")
+=======
+            data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/{i[0]}_1/metrics_{test_name}_epoch50")
+            data2 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/{i[0]}_2/metrics_{test_name}_epoch50")
+            data3 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/{i[0]}_3/metrics_{test_name}_epoch50")
+            data4 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/{i[1]}_1/metrics_{test_name}_epoch50")
+            data5 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/{i[1]}_2/metrics_{test_name}_epoch50")
+            data6 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/{i[1]}_3/metrics_{test_name}_epoch50")
+>>>>>>> origin/main
 
             # compute the average for each patient in each experiment
             patient_averages_data1 = calculate_patient_averages(data1)
@@ -164,7 +204,11 @@ if __name__ == "__main__":
 
                 # MSE
                 print("Wilcoxon MSE:")
+<<<<<<< HEAD
                 compute_wilcoxon_test(metric_sets_1['mse'], metric_sets_2['mse'], "less")
+=======
+                # compute_wilcoxon_test(metric_sets_1['mse'], metric_sets_2['mse'], "less")
+>>>>>>> origin/main
                 # SSIM
                 print("Wilcoxon SSIM:")
                 # compute_wilcoxon_test(metric_sets_1['ssim'], metric_sets_2['ssim'], "greater")
@@ -173,10 +217,17 @@ if __name__ == "__main__":
                 # compute_wilcoxon_test(metric_sets_1['vif'], metric_sets_2['vif'], "greater")
                 # NIQE
                 print("Wilcoxon NIQE:")
+<<<<<<< HEAD
                 # compute_wilcoxon_test(metric_sets_1['NIQE'], metric_sets_2['NIQE'], "less")
                 # PIQE
                 print("Wilcoxon PIQE:")
                 # compute_wilcoxon_test(metric_sets_1['PIQE'], metric_sets_2['PIQE'], "less")
+=======
+                compute_wilcoxon_test(metric_sets_1['NIQE'], metric_sets_2['NIQE'], "less")
+                # PIQE
+                print("Wilcoxon PIQE:")
+                compute_wilcoxon_test(metric_sets_1['PIQE'], metric_sets_2['PIQE'], "less")
+>>>>>>> origin/main
             except:
                   print(f"TEST {test_name}, ({i[0]}-{i[1]})")
                   pass

@@ -14,26 +14,6 @@ def weights_init_normal(m):
         torch.nn.init.constant_(m.bias.data, 0.0)
 
 
-def ada_in(content_feature, mean_s, std_s, epsilon=1e-5):
-    # Calculate mean and standard deviation of content feature
-    mean_c = torch.mean(content_feature, dim=(2, 3), keepdim=True)
-    std_c = torch.std(content_feature, dim=(2, 3), keepdim=True) + epsilon
-
-    # Broadcast mean_s and std_s to match content_feature's batch size
-    mean_s = mean_s.unsqueeze(2).unsqueeze(3)
-    std_s = std_s.unsqueeze(2).unsqueeze(3)
-
-    # Apply AdaIN formula
-    print("Mean_s:")
-    print(mean_s.shape)
-    print("content:")
-    print(content_feature.shape)
-    normalized_content = std_s * (content_feature - mean_c) / (std_c + 1e-5) + mean_s
-    print("normalized:")
-    print(normalized_content.shape)
-    return normalized_content
-
-
 class LambdaLR:
     def __init__(self, n_epochs, offset, decay_start_epoch):
         assert (n_epochs - decay_start_epoch) > 0, "Decay must start before the training session ends!"
@@ -142,83 +122,6 @@ class Generator(nn.Module):
         return x
 
 
-class Generator_AdaIn(nn.Module):
-    def __init__(self, out_channels=1, dim=64, n_upsample=2, shared_block=None):
-        super(Generator_AdaIn, self).__init__()
-
-        self.shared_block = shared_block
-
-        layers = []
-        dim = dim * 2 ** n_upsample
-        # Residual blocks
-        for _ in range(3):
-            layers += [ResidualBlock(dim)]
-
-        # Upsampling
-        for _ in range(n_upsample):
-            layers += [
-                nn.ConvTranspose2d(dim, dim // 2, 4, stride=2, padding=1),
-                nn.InstanceNorm2d(dim // 2),
-                nn.LeakyReLU(0.2, inplace=True),
-            ]
-            dim = dim // 2
-
-        # Output layer
-        layers += [nn.ReflectionPad2d(3), nn.Conv2d(dim, out_channels, 7), nn.Tanh()]
-
-        self.model_blocks = nn.Sequential(*layers)
-
-    def forward(self, x, mean_s, std_s):
-        x = ada_in(x, mean_s, std_s)
-        x = self.shared_block(x)
-        x = self.model_blocks(x)
-        return x
-
-
-#################################
-#           STYLE ENCODER
-#################################
-class StyleEncoder(nn.Module):
-    def __init__(self, in_channels=3, out_channels=256, num_conv=8):
-        super(StyleEncoder, self).__init__()
-
-        self.p_gamma = torch.tensor(0.0)
-        self.p_beta = torch.tensor(0.0)
-
-        layers = [
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.InstanceNorm2d(out_channels, affine=True, track_running_stats=True),
-            nn.ReLU(inplace=True),
-        ]
-
-        for _ in range(num_conv):
-            layers += [
-                nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
-                nn.InstanceNorm2d(out_channels, affine=True, track_running_stats=True),
-                nn.ReLU(inplace=True),
-            ]
-
-        layers += [
-            nn.AdaptiveAvgPool2d(1),
-            nn.Flatten(),
-            nn.Linear(out_channels, out_channels),
-            nn.ReLU(inplace=True),
-            nn.Linear(out_channels, out_channels),
-            nn.ReLU(inplace=True),
-            nn.Linear(out_channels, 2 * out_channels),  # Output gamma and beta
-        ]
-
-        self.model = nn.Sequential(*layers)
-
-    def forward(self, x):
-        output = self.model(x)
-
-        self.p_gamma = 0.95 * self.p_gamma + 0.05 * output[..., :output.size(-1) // 2].detach()
-        self.p_beta = 0.95 * self.p_beta + 0.05 * output[..., output.size(-1) // 2:].detach()
-
-        return self.p_gamma, self.p_beta  # beta and gamma, respectively in the paper
-
-
 ##############################
 #        Discriminator
 ##############################
@@ -249,10 +152,3 @@ class Discriminator(nn.Module):
 
     def forward(self, img):
         return self.model(img)
-
-
-if __name__ == "__main__":
-    d = Encoder()
-    t = torch.ones((1, 3, 256, 256))
-    print(t.size(0))
-    z, t = d(t)
