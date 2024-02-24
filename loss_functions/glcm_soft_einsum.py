@@ -3,10 +3,7 @@ import torch.nn as nn
 
 
 # approx version
-<<<<<<< HEAD
 ##################################
-=======
->>>>>>> origin/main
 class _GridExtractor(nn.Module):
 
     def forward(self, x):
@@ -17,10 +14,7 @@ class _GridExtractor_d5(nn.Module):
 
     def forward(self, x):
         return _extract_grid_d5(x)
-<<<<<<< HEAD
 ##################################
-=======
->>>>>>> origin/main
 
 
 def soft_binning_einsum(x, centers, sigma=0.5):
@@ -114,10 +108,6 @@ def compute_haralick_features(glcm):
 
     return contrast
 
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/main
 # approx version
 def _extract_grid(image):
     haralick_grid = []
