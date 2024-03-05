@@ -29,121 +29,121 @@ rc('text', usetex=True)
 # ------------------------------------------------------------------- #
 # ------------------------------------------------------------------- #
 # PERCEPTION-DISTORTION PLOT
-<<<<<<< HEAD
+
 plt.figure(figsize=(column_width_inches, column_width_inches / aspect_ratio))
-=======
-"""plt.figure(figsize=(column_width_inches, column_width_inches / aspect_ratio))
->>>>>>> origin/main
+
+plt.figure(figsize=(column_width_inches, column_width_inches / aspect_ratio))
 
 # plt.scatter([31.9714, 31.8105, 31.8427, 32.1373, 31.8319], [0.9626, 0.9594, 0.9580, 0.9614, 0.9588], marker='o')
-mse_pix2pix = [0.02252, 0.01050, 0.01050, 0.01032, 0.01042, 0.01162, 0.01041, 0.01055, 0.01037, 0.01063]
+
+###### mse_pix2pix = [0.02252, 0.01050, 0.01050, 0.01032, 0.01042, 0.01162, 0.01041, 0.01055, 0.01037, 0.01063]
+mse_pix2pix = [2.25, 10.50, 10.50, 10.32, 10.42, 11.62, 10.41, 10.55, 10.37, 10.63]
 # Find the minimum and maximum values in the list
 # min_mse_value = min(mse)
 # max_mse_value = max(mse)
 # Normalize the list
 # mse = [(x - min_mse_value) / (max_mse_value - min_mse_value) for x in mse]
 
-niqe_pix2pix = [17.02715, 6.52625, 6.50243, 6.23657, 6.06699, 5.19338, 6.56729, 6.16399, 6.06902, 6.44128]
-piqe_pix2pix = [23.54948, 8.60171, 8.79549, 8.54729, 8.80961, 7.35751, 8.71142, 8.91563, 8.29945, 8.74611]
+#########niqe_pix2pix = [17.02715, 6.52625, 6.50243, 6.23657, 6.06699, 5.19338, 6.56729, 6.16399, 6.06902, 6.44128]
+niqe_pix2pix = [17.0272, 6.5263, 6.5024, 6.2366, 6.0670, 5.1934, 6.5673, 6.1640, 6.0690, 6.4413]
+#########piqe_pix2pix = [23.54954, 8.60171, 8.79549, 8.54729, 8.80961, 7.35751, 8.71142, 8.91563, 8.29945, 8.74611]
+piqe_pix2pix = [23.5495, 8.6017, 8.7950, 8.5473, 8.8096, 7.3575, 8.7114, 8.9156, 8.2995, 8.7461]
 # fid_imnet_pix2pix = [80.31756, 45.27445, 44.75019, 47.12884, 45.64557, 69.52257, 44.42599]
 # fid_random_pix2pix = [115.85072, 61.73528, 61.32585, 63.72904, 62.34899, 90.06185,  60.32384]
 # min_niqe_value = min(niqe)
 # max_niqe_value = max(niqe)
 # Normalize the list
 # niqe = [(x - min_niqe_value) / (max_niqe_value - min_niqe_value) for x in niqe]
-mse_cycleGAN = [0.02252, 0.01015, 0.00970, 0.00932, 0.00954, 0.00989, 0.01017, 0.00969, 0.01050, 0.01084]
-niqe_cycleGAN = [17.02715, 9.62032, 9.28434, 8.66423, 8.51001, 5.32091, 10.17277, 8.03170, 10.27325, 10.70923]
-piqe_cycleGAN = [23.54948, 12.68929, 11.93226, 10.97366, 11.12554, 5.44317, 13.32563, 8.71662, 13.01870, 13.58824]
+###########mse_cycleGAN = [0.02252, 0.01015, 0.00970, 0.00932, 0.00954, 0.00989, 0.01017, 0.00969, 0.01050, 0.01084]
+mse_cycleGAN = [2.25, 10.15, 9.70, 9.32, 9.54, 9.89, 10.17, 9.69, 10.50, 10.84]
+###########niqe_cycleGAN = [17.02715, 9.62032, 9.28434, 8.66423, 8.51001, 5.32091, 10.17277, 8.03170, 10.27325, 10.70923]
+niqe_cycleGAN = [17.0272, 9.6203, 9.2843, 8.6642, 8.5100, 5.3209, 10.1728, 8.0317, 10.2733, 10.7092]
+############piqe_cycleGAN = [23.54948, 12.68929, 11.93226, 10.97366, 11.12554, 5.44317, 13.32563, 8.71662, 13.01870, 13.58824]
+piqe_cycleGAN = [23.5495, 12.6893, 11.9323, 10.9737, 11.1255, 5.4432, 13.3256, 8.7166, 13.0187, 13.5882]
 # fid_imnet_cycleGAN = [80.31756, 69.39279, 69.17404, 67.30076, 65.84454, 69.50455, 64.00218]
 # fid_random_cycleGAN = [115.85072, 92.21178, 92.28362, 87.92113, 86.52458, 87.83419,  84.71191]
 
-mse_unit = [0.02252, 0.00885, 0.00732, 0.00770, 0.00741, 0.00739, 0.00854, 0.00768, 0.00764, 0.00783]
-niqe_unit = [17.02715, 6.45745, 6.84344, 6.75063, 7.16556, 6.02491, 6.50301, 7.25239, 7.41838, 6.68971]
-<<<<<<< HEAD
-piqe_unit = [23.54948, 8.31790, 7.5657, 7.88673, 7.78715, 7.41100, 7.79082, 7.63876, 7.56228, 7.22717]
-=======
-piqe_unit = [23.54948, 8.30951, 7.56712, 7.88673, 7.78715, 7.41100, 7.79082, 7.63876, 7.56228, 7.22717]
->>>>>>> origin/main
+############mse_unit = [0.02252, 0.00885, 0.00732, 0.00770, 0.00741, 0.00739, 0.00854, 0.00768, 0.00764, 0.00783]
+mse_unit = [2.25, 8.85, 7.32, 7.70, 7.41, 7.39, 8.54, 7.68, 7.64, 7.83]
+############niqe_unit = [17.02715, 6.45745, 6.84344, 6.75063, 7.16556, 6.02491, 6.50301, 7.25239, 7.41838, 6.68971]
+niqe_unit = [17.0272, 6.4581, 6.8441, 6.7520, 7.1659, 6.0238, 6.5030, 7.2524, 7.4184, 6.6897]
+##########piqe_unit = [23.54948, 8.31790, 7.5657, 7.88673, 7.78715, 7.41100, 7.79082, 7.63876, 7.56228, 7.22717]
+piqe_unit = [23.5495, 8.3179, 7.5657, 7.8877, 7.7813, 7.4110, 7.7908, 7.6388, 7.5623, 7.2272]
 # fid_imnet_unit = [80.31756, 66.08463, 54.15049, 57.00600, 56.91359, 55.71386, 57.22355]
 # fid_random_unit = [115.85072, 84.50406,  66.93555, 70.92612, 71.06563, 70.40341, 71.40135]
 
 plt.scatter(mse_pix2pix[1:], piqe_pix2pix[1:], marker='o', color='orange')
 plt.scatter(mse_cycleGAN[1:], piqe_cycleGAN[1:], marker='o', color='red')
-<<<<<<< HEAD
 plt.scatter(mse_unit[1:], piqe_unit[1:], marker='o', color='blue')
-=======
-plt.scatter(mse_unit[1:], piqe_unit[1:], marker='o', color='blue')"""
->>>>>>> origin/main
+
+plt.scatter(mse_unit[1:], piqe_unit[1:], marker='o', color='blue')
 
 # plt.annotate('LD', (mse_pix2pix[0], niqe_pix2pix[0]))
-"""plt.annotate('Baseline', (mse_pix2pix[1], niqe_pix2pix[1]+0.26), fontsize=12)
-plt.annotate('MSTLF-max', (mse_pix2pix[2]+0.00008, niqe_pix2pix[2]+0.08), fontsize=12)
-plt.annotate('MSTLF-average', (mse_pix2pix[3]-0.0005, niqe_pix2pix[3]+0.1), fontsize=12, ha="center")
-plt.annotate('MSTLF-Frobenius', (mse_pix2pix[4]+0.00008, niqe_pix2pix[4]-0.2), fontsize=12)
-plt.annotate('MSTLF-attention', (mse_pix2pix[5]+0.0007, niqe_pix2pix[5]+0.1), fontsize=12, ha="right")
+"""plt.annotate('Baseline', (mse_pix2pix[1], niqe_pix2pix[1]+0.3), fontsize=12)
+plt.annotate('MSTLF-max', (mse_pix2pix[2]+0.00008, niqe_pix2pix[2]+0.11), fontsize=12)
+plt.annotate('MSTLF-average', (mse_pix2pix[3]-0.5, niqe_pix2pix[3]+0.0), fontsize=12, ha="center")
+plt.annotate('MSTLF-Frobenius', (mse_pix2pix[4]+0.04, niqe_pix2pix[4]-0.25), fontsize=12)
+plt.annotate('MSTLF-attention', (mse_pix2pix[5]+0.04, niqe_pix2pix[5]+0.1), fontsize=12, ha="right")
 plt.annotate('VGG-16', (mse_pix2pix[6], niqe_pix2pix[6]+0.1), fontsize=12, ha='right')
-plt.annotate('AE-CT', (mse_pix2pix[7]+0.00068, niqe_pix2pix[7]-0.05), fontsize=12, ha='right')
-plt.annotate('SSIM', (mse_pix2pix[8]-0.00005, niqe_pix2pix[8]-0.2), fontsize=12, ha='right')
-plt.annotate('EDGE', (mse_pix2pix[9]+0.0006, niqe_pix2pix[9]-0.06), fontsize=12, ha='right')
+plt.annotate('AE-CT', (mse_pix2pix[7]+0.48, niqe_pix2pix[7]-0.05), fontsize=12, ha='right')
+plt.annotate('SSIM-L', (mse_pix2pix[8]-0.03, niqe_pix2pix[8]-0.2), fontsize=12, ha='right')
+plt.annotate('EDGE', (mse_pix2pix[9]+0.44, niqe_pix2pix[9]-0.06), fontsize=12, ha='right')
 plt.annotate('Baseline', (mse_cycleGAN[1], niqe_cycleGAN[1]+0.1), fontsize=12, ha="center")
 plt.annotate('MSTLF-max', (mse_cycleGAN[2], niqe_cycleGAN[2]+0.1), fontsize=12, ha="center")
 plt.annotate('MSTLF-average', (mse_cycleGAN[3]+0.00016, niqe_cycleGAN[3]+0.1), fontsize=12, ha="center")
-plt.annotate('MSTLF-Frobenius', (mse_cycleGAN[4]+0.00008, niqe_cycleGAN[4]), fontsize=12)
+plt.annotate('MSTLF-Frobenius', (mse_cycleGAN[4]+0.05, niqe_cycleGAN[4]), fontsize=12)
 plt.annotate('MSTLF-attention', (mse_cycleGAN[5], niqe_cycleGAN[5]+0.1), fontsize=12, ha="center")
 plt.annotate('VGG-16', (mse_cycleGAN[6]-0.0002, niqe_cycleGAN[6]+0.08), fontsize=12, ha="center")
 plt.annotate('AE-CT', (mse_cycleGAN[7], niqe_cycleGAN[7]+0.08), fontsize=12, ha="center")
-plt.annotate('SSIM', (mse_cycleGAN[8]+0.00008, niqe_cycleGAN[8]+0.09), fontsize=12, ha="center")
+plt.annotate('SSIM-L', (mse_cycleGAN[8]+0.2, niqe_cycleGAN[8]+0.09), fontsize=12, ha="center")
 plt.annotate('EDGE', (mse_cycleGAN[9], niqe_cycleGAN[9]+0.08), fontsize=12, ha="center")
-plt.annotate('Baseline', (mse_unit[1]-0.0003, niqe_unit[1]-0.3), fontsize=12, ha="left")
-plt.annotate('MSTLF-max', (mse_unit[2]-0.0007, niqe_unit[2]+0.1), fontsize=12)
+plt.annotate('Baseline', (mse_unit[1]-0.2, niqe_unit[1]-0.3), fontsize=12, ha="left")
+plt.annotate('MSTLF-max', (mse_unit[2]-0.2, niqe_unit[2]+0.1), fontsize=12)
 plt.annotate('MSTLF-average', (mse_unit[3], niqe_unit[3]+0.1), fontsize=12)
-plt.annotate('MSTLF-Frobenius', (mse_unit[4]-0.00135, niqe_unit[4]+0.1), fontsize=12)
+plt.annotate('MSTLF-Frobenius', (mse_unit[4]+0.32, niqe_unit[4]+0.02), fontsize=12)
 plt.annotate('MSTLF-attention', (mse_unit[5]-0.0007, niqe_unit[5]+0.1), fontsize=12)
 plt.annotate('VGG-16', (mse_unit[6], niqe_unit[6]+0.1), fontsize=12, ha="center")
-plt.annotate('AE-CT', (mse_unit[7]+0.0004, niqe_unit[7]), fontsize=12, ha="center")
-plt.annotate('SSIM', (mse_unit[8], niqe_unit[8]+0.1), fontsize=12, ha="center")
+plt.annotate('AE-CT', (mse_unit[7]-0.3, niqe_unit[7]), fontsize=12, ha="center")
+plt.annotate('SSIM-L', (mse_unit[8], niqe_unit[8]+0.1), fontsize=12, ha="center")
 plt.annotate('EDGE', (mse_unit[9]-0.00006, niqe_unit[9]-0.28), fontsize=12, ha="center")"""
 ##########
-"""plt.annotate('Baseline', (mse_pix2pix[1]+0.00005, piqe_pix2pix[1]-0.32), fontsize=12)
-plt.annotate('MSTLF-max', (mse_pix2pix[2]+0.0001, piqe_pix2pix[2]+0.1), fontsize=12)
-plt.annotate('MSTLF-average', (mse_pix2pix[3]-0.00062, piqe_pix2pix[3]-0.28), fontsize=12, ha="center")
-plt.annotate('MSTLF-Frobenius', (mse_pix2pix[4]-0.00134, piqe_pix2pix[4]+0.28), fontsize=12)
+plt.annotate('Baseline', (mse_pix2pix[1]+0.04, piqe_pix2pix[1]-0.32), fontsize=12)
+plt.annotate('MSTLF-max', (mse_pix2pix[2]+0.1, piqe_pix2pix[2]+0.1), fontsize=12)
+plt.annotate('MSTLF-average', (mse_pix2pix[3]-0.45, piqe_pix2pix[3]-0.28), fontsize=12, ha="center")
+plt.annotate('MSTLF-Frobenius', (mse_pix2pix[4]-1, piqe_pix2pix[4]+0.28), fontsize=12)
 plt.annotate('MSTLF-attention', (mse_pix2pix[5], piqe_pix2pix[5]+0.15), fontsize=12, ha="right")
-plt.annotate('VGG-16', (mse_pix2pix[6]-0.00004, piqe_pix2pix[6]), fontsize=12, ha='right')
-plt.annotate('AE-CT', (mse_pix2pix[7]+0.0006, piqe_pix2pix[7]+0.28), fontsize=12, ha='right')
-plt.annotate('SSIM', (mse_pix2pix[8]+0.0002, piqe_pix2pix[8]-0.4), fontsize=12, ha='right')
-plt.annotate('EDGE', (mse_pix2pix[9]+0.0006, piqe_pix2pix[9]-0.18), fontsize=12, ha='right')
+plt.annotate('VGG-16', (mse_pix2pix[6]-0.05, piqe_pix2pix[6]), fontsize=12, ha='right')
+plt.annotate('AE-CT', (mse_pix2pix[7]+0.4, piqe_pix2pix[7]+0.28), fontsize=12, ha='right')
+plt.annotate('SSIM-L', (mse_pix2pix[8]+0.0002, piqe_pix2pix[8]-0.4), fontsize=12, ha='right')
+plt.annotate('EDGE', (mse_pix2pix[9]+0.45, piqe_pix2pix[9]-0.18), fontsize=12, ha='right')
 plt.annotate('Baseline', (mse_cycleGAN[1]-0.00008, piqe_cycleGAN[1]+0.15), fontsize=12, ha="center")
 plt.annotate('MSTLF-max', (mse_cycleGAN[2], piqe_cycleGAN[2]+0.15), fontsize=12, ha="center")
 plt.annotate('MSTLF-average', (mse_cycleGAN[3]+0.00016, piqe_cycleGAN[3]-0.4), fontsize=12, ha="center")
-plt.annotate('MSTLF-Frobenius', (mse_cycleGAN[4]+0.00008, piqe_cycleGAN[4]), fontsize=12)
+plt.annotate('MSTLF-Frobenius', (mse_cycleGAN[4]+0.08, piqe_cycleGAN[4]), fontsize=12)
 plt.annotate('MSTLF-attention', (mse_cycleGAN[5], piqe_cycleGAN[5]+0.2), fontsize=12, ha="center")
 plt.annotate('VGG-16', (mse_cycleGAN[6], piqe_cycleGAN[6]+0.15), fontsize=12, ha="center")
-plt.annotate('AE-CT', (mse_cycleGAN[7]-0.00005, piqe_cycleGAN[7]-0.05), fontsize=12, ha='right')
-plt.annotate('SSIM', (mse_cycleGAN[8]+0.00051, piqe_cycleGAN[8]-0.2), fontsize=12, ha='right')
-plt.annotate('EDGE', (mse_cycleGAN[9]+0.0006, piqe_cycleGAN[9]-0.06), fontsize=12, ha='right')
-plt.annotate('Baseline', (mse_unit[1]-0.0006, piqe_unit[1]+0.15), fontsize=12, ha="left")
-plt.annotate('MSTLF-max', (mse_unit[2]-0.0011, piqe_unit[2]-0.1), fontsize=12)
-plt.annotate('MSTLF-average', (mse_unit[3]-0.0005, piqe_unit[3]+0.2), fontsize=12)
-plt.annotate('MSTLF-Frobenius', (mse_unit[4]-0.0014, piqe_unit[4]+0.1), fontsize=12)
-plt.annotate('MSTLF-attention', (mse_unit[5]-0.0012, piqe_unit[5]-0.3), fontsize=12)
-plt.annotate('VGG-16', (mse_unit[6]+0.0001, piqe_unit[6]-0.4), fontsize=12, ha="center")
-plt.annotate('AE-CT', (mse_unit[7]+0.00068, piqe_unit[7]-0.015), fontsize=12, ha='right')
-plt.annotate('SSIM', (mse_unit[8]+0.0005, piqe_unit[8]-0.2), fontsize=12, ha='right')
-plt.annotate('EDGE', (mse_unit[9]+0.0003, piqe_unit[9]-0.4), fontsize=12, ha='right')
+plt.annotate('AE-CT', (mse_cycleGAN[7], piqe_cycleGAN[7]+0.05), fontsize=12, ha='right')
+plt.annotate('SSIM-L', (mse_cycleGAN[8]+0.5, piqe_cycleGAN[8]-0.2), fontsize=12, ha='right')
+plt.annotate('EDGE', (mse_cycleGAN[9]+0.45, piqe_cycleGAN[9]-0.06), fontsize=12, ha='right')
+plt.annotate('Baseline', (mse_unit[1]-0.2, piqe_unit[1]+0.15), fontsize=12, ha="left")
+plt.annotate('MSTLF-max', (mse_unit[2]-0.2, piqe_unit[2]-0.6), fontsize=12)
+plt.annotate('MSTLF-average', (mse_unit[3]-0.0005, piqe_unit[3]+0.05), fontsize=12)
+plt.annotate('MSTLF-Frobenius', (mse_unit[4]-0.2, piqe_unit[4]+0.6), fontsize=12)
+plt.annotate('MSTLF-attention', (mse_unit[5]-0.2, piqe_unit[5]-0.8), fontsize=12)
+plt.annotate('VGG-16', (mse_unit[6]+0.2, piqe_unit[6]-0.4), fontsize=12, ha="center")
+plt.annotate('AE-CT', (mse_unit[7]+0.5, piqe_unit[7]-0.015), fontsize=12, ha='right')
+plt.annotate('SSIM-L', (mse_unit[8]+0.4, piqe_unit[8]-0.2), fontsize=12, ha='right')
+plt.annotate('EDGE', (mse_unit[9]+0.43, piqe_unit[9]-0.15), fontsize=12, ha='right')
 # plt.ylim([0.925, 1.02])
 plt.legend(['Pix2Pix', 'CycleGAN', 'UNIT'])
-plt.xlim([0.006, 0.012])
-<<<<<<< HEAD
+# plt.xlim([0, 0.012])
 plt.ylabel("PIQUE")
-=======
-plt.ylabel("PIQE")
->>>>>>> origin/main
-plt.xlabel("MSE")
+# plt.ylabel("PIQE")
+plt.xlabel("MSE $(1e-3)$")
 plt.tight_layout()
 # plt.title('Perception-distorsion evaluation', fontsize=9)
 plt.savefig('/Users/francescodifeola/Desktop/PIQE-MSE.pdf', format='pdf')
-plt.show()"""
+plt.show()
 
 
 # ------------------------------------------------------------------- #
@@ -252,19 +252,11 @@ profile_test_2_low_dose = raps_ld
 # raps_ld = json.load(raps_ld)
 # profile_elcap_low_dose = element_wise_average2([raps_ld])
 
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main
 # Test 3 (LIDC/IDRI) low-dose profile
 # raps_ld = open(f'/Volumes/Untitled/results_per_patient/metrics_low_dose_reference/raps_test_3_ld.json')
 # raps_ld = json.load(raps_ld)
 # profile_test_3_low_dose = element_wise_average2([raps_ld])
 
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main
 # Test 2
 py.semilogy(profile_test_2_baseline)
 py.semilogy(profile_test_2_texture_max)
@@ -320,11 +312,10 @@ py.show()"""
 # Template Matching
 
 def kernel_density_estimate(d):  # , img3
-<<<<<<< HEAD
+
     sns.kdeplot(d["baseline"]["hd"], color='#40E0D0')
-=======
+
     # sns.kdeplot(d["baseline"]["hd"], color='#33a02c')
->>>>>>> origin/main
     sns.kdeplot(d["baseline"]["ld"], color='#e41a1c')
     sns.kdeplot(d["baseline"]["deno"], color='#1f78b4')
     sns.kdeplot(d["perceptual"]["deno"], color='#ff7f00')
@@ -344,7 +335,6 @@ def kernel_density_estimate(d):  # , img3
     # sns.kdeplot(data2, shade=True, color='red')
     # sns.histplot(data3, color='orange')
     # Customize the plot
-<<<<<<< HEAD
     plt.legend(["LDCT", "Baseline", "VGG-16", "AE-CT", "SSIM", "EDGE", "MSTLF-max", "MSTLF-average", "MSLTF-Frobenius", "MSTLF-attention"], fontsize=15)
     # plt.title("Kernel Density Estimate (KDE) Plot (Test set 4, UNIT)")
     plt.ylim(0, 25)
@@ -353,7 +343,6 @@ def kernel_density_estimate(d):  # , img3
     plt.ylabel("Density")
     plt.tight_layout()
     plt.savefig('/Users/francescodifeola/Desktop/pix2pix_test_4_tm.pdf', format='pdf')
-=======
     plt.legend(["LDCT", "baseline", "VGG-16", "AE-CT", "SSIM", "EDGE", "MSTLF-max", "MSTLF-average", "MSLTF-Frobenius", "MSTLF-attention"], fontsize=15)
     # plt.title("Kernel Density Estimate (KDE) Plot (Test set 4, UNIT)")
     plt.ylim(0, 75)
@@ -362,19 +351,15 @@ def kernel_density_estimate(d):  # , img3
     plt.ylabel("Density")
     plt.tight_layout()
     plt.savefig('/Users/francescodifeola/Desktop/UNIT_test_4_tm.pdf', format='pdf')
->>>>>>> origin/main
     # Display the plot
     plt.show()
 
 
 # Plot template matching KDE
-<<<<<<< HEAD
 # model = "cycleGAN"
 """data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/metrics_baseline_1/tm_elcap_complete_epoch50")
-=======
 model = "cycleGAN"
 data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/metrics_baseline_1/tm_elcap_complete_epoch50")
->>>>>>> origin/main
 data2 = load_from_json(f"/Volumes/Untitled/results_per_patient/metrics_baseline_2/tm_elcap_complete_epoch50")
 data3 = load_from_json(f"/Volumes/Untitled/results_per_patient/metrics_baseline_3/tm_elcap_complete_epoch50")
 data4 = load_from_json(f"/Volumes/Untitled/results_per_patient/metrics_perceptual_1/tm_elcap_complete_epoch50")
@@ -400,7 +385,6 @@ data23 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_ssi
 data24 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_ssim_3/tm_elcap_complete_epoch50")
 data25 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_edge_1/tm_elcap_complete_epoch50")
 data26 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_edge_2/tm_elcap_complete_epoch50")
-<<<<<<< HEAD
 data27 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_edge_3/tm_elcap_complete_epoch50")"""
 
 data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_baseline_tm_1/tm_elcap_complete_epoch50")
@@ -458,9 +442,7 @@ data24 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics
 data25 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_edge_1/tm_elcap_complete_epoch50")
 data26 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_edge_2/tm_elcap_complete_epoch50")
 data27 = load_from_json(f"/Volumes/Untitled/results_per_patient/cycleGAN/metrics_edge_3/tm_elcap_complete_epoch50")"""
-=======
 data27 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_edge_3/tm_elcap_complete_epoch50")
->>>>>>> origin/main
 
 d_ = {"baseline": {"deno": [], "hd": [], "ld": []},
       "texture_max": {"deno": [], "hd": [], "ld": []},

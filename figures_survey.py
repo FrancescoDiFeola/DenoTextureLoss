@@ -21,13 +21,13 @@ rc('text', usetex=True)
 # ------------------------------------------------------------------- #
 # ------------------------------------------------------------------- #
 # Missing modalities
-"""labels = ['Theoretically', 'No', 'Yes']
-sizes = [6, 43, 5]  # Percentages
+labels = ['Theoretically Robust', 'Not Robust', 'Robust']
+sizes = [7, 84, 9]  # Percentages
 # colors
-# colors = ['#22fd33', '#66b3ff', '#99ff99', '#ff9999']
+colors = ['#66b3ff', '#ff9999', '#99ff99']
 
 fig1, ax1 = plt.subplots()
-ax1.pie(sizes, labels=labels, autopct=lambda p: "{:.0f}\n ({:.1f}\%)".format(p * sum(sizes) / 100, p), startangle=90, textprops={'family': 'serif', 'size': 14, 'weight': 'bold'})
+ax1.pie(sizes, labels=labels, autopct=lambda p: "{:.1f}\%".format(p * sum(sizes) / 100, p), startangle=90, textprops={'family': 'serif', 'size': 20, 'weight': 'bold'}, colors=colors)
 # draw circle
 #centre_circle = plt.Circle((0, 0), 0.70, fc='white')
 
@@ -35,12 +35,12 @@ ax1.pie(sizes, labels=labels, autopct=lambda p: "{:.0f}\n ({:.1f}\%)".format(p *
 # Equal aspect ratio ensures that pie is drawn as a circle
 ax1.axis('equal')
 plt.tight_layout()
-plt.show()"""
+plt.show()
 
 # ------------------------------------------------------------------- #
 # ------------------------------------------------------------------- #
 # Explainability
-labels = ['Unimodal XAI', 'Multimodal XAI', "No XAI"]
+"""labels = ['Unimodal XAI', 'Multimodal XAI', "No XAI"]
 labels_1 = ['XAI', "No XAI"]
 sizes = [19, 8, 34]  # Percentages
 sizes_1 = [20, 34]
@@ -58,7 +58,7 @@ ax1.pie(sizes_1, labels=labels_1, colors=colors_1, autopct=lambda p: "{:.0f}\n (
 ax1.axis('equal')
 
 plt.tight_layout()
-plt.show()
+plt.show()"""
 
 # Radar chart
 # Data for the first radar chart
@@ -129,7 +129,7 @@ plt.show()"""
 
 
 # Radar chart Data for the first radar chart
-# labels1 = np.array(['CT', 'MRI', 'PET', 'X-ray', 'MFI', 'US', 'WSI', "Notes", "clinical", 'Genomics', 'chemical', 'Electrical', 'Physical', 'Speech', 'Video', 'eHR', 'OCT'])  # Categories/Labels
+"""# labels1 = np.array(['CT', 'MRI', 'PET', 'X-ray', 'MFI', 'US', 'WSI', "Notes", "clinical", 'Genomics', 'chemical', 'Electrical', 'Physical', 'Speech', 'Video', 'eHR', 'OCT'])  # Categories/Labels
 labels1 = np.array(['CT', 'MRI', 'PET', 'X-ray', 'MFI', 'US', 'WSI', "Q-A", "clinical", 'Genomics', 'chemical', "Physio", 'Speech', 'Video', 'eHR', 'OCT', "2D Fundus", "Skin lesion"])  # Categories/Labels
 
 # values1 = np.array([8, 4, 2, 0, 0, 1, 2, 0, 7, 8, 2, 0, 0, 0, 0, 0, 0])  # Corresponding values for each category
@@ -200,7 +200,7 @@ plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
 
 #ax.grid(False)
 # Display
-plt.show()
+plt.show()"""
 
 
 # ------------------------------------------------------------------- #

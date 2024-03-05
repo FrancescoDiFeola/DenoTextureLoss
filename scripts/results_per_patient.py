@@ -12,28 +12,75 @@ from data.storage import *
 import copy
 
 
+# given n experiments compute the average between slices for the same patient
+def average_per_slice_patient(data):
+    overall_patient_averages = {}
+
+    patient_ids = list(data[0].keys())
+
+    for patient_id in patient_ids:
+        patient_metrics = {}
+
+        for metric in data[0][patient_id]:
+
+            if metric.find("FID") != -1 or metric.find("paq2piq") != -1:
+                continue
+            else:
+                metrics_values = [sum(values)/len(values) for values in zip(data[0][patient_id][metric], data[1][patient_id][metric], data[2][patient_id][metric])]
+                patient_metrics[metric] = metrics_values
+
+        overall_patient_averages[patient_id] = patient_metrics
+
+    return overall_patient_averages
+
+
+def overall_metric_set(data):
+    all_values = {"psnr": [], "mse": [], 'ssim': [], 'vif': [], 'paq2piq': [], 'NIQE': [], 'PIQE': [], 'FID_ImNet': [], 'FID_random': [], 'brisque': []}
+    for patient_id, metrics in data.items():
+        for metric, values in metrics.items():
+
+            if metric.find("FID") != -1:
+                continue
+            else:
+                all_values[metric].extend(values)
+    return all_values
+
+
+def overall_per_slice_average(data):
+    all_values = {"psnr": [], "mse": [], 'ssim': [], 'vif': [], 'paq2piq': [], 'NIQE': [], 'PIQE': [], 'FID_ImNet': [], 'FID_random': [], 'brisque': []}
+
+    for metric in data[0].keys():
+        if metric.find("FID") != -1:
+            continue
+        else:
+            per_slice_avg_metrics = [(a + b + c) / 3 for a, b, c in zip(data[0][metric], data[1][metric], data[2][metric])]
+            all_values[metric] = per_slice_avg_metrics
+
+    return all_values
+
+
 # 1) for each patient in the set compute the average metric score
 def calculate_patient_averages(data):
     patient_averages = {}
+    # patient_stds = {}
 
     for patient_id, metrics in data.items():
         patient_metrics = {}
+        # patient_std_metric = {}
 
         for metric, values in metrics.items():
-<<<<<<< HEAD
+
             if metric.find("FID") != -1:
                 continue
             else:
                 metric_average = sum(values) / len(values) if values else 0
                 patient_metrics[metric] = metric_average
-=======
-            metric_average = sum(values) / len(values) if values else 0
-            patient_metrics[metric] = metric_average
->>>>>>> origin/main
+                # patient_std_metric[metric] = np.std(values)
 
         patient_averages[patient_id] = patient_metrics
+        # patient_stds[patient_id] = patient_std_metric
 
-    return patient_averages
+    return patient_averages  # , patient_stds
 
 
 # 2) compute the average between experiments (before this, compute the per patient average for each experiment)
@@ -57,7 +104,8 @@ def calculate_overall_patient_average(patient_averages_list):
 
 # 3) compute the overall average among patients
 def calculate_average_metrics(data):
-    average_metrics = {"psnr": 0, "mse": 0, 'ssim': 0, 'vif': 0, 'paq2piq': 0, 'NIQE': 0, 'PIQE': 0, 'FID_ImNet': 0, 'FID_random': 0, 'brisque': 0}  # 'FID_ImNet': 0, 'FID_random': 0
+    average_metrics = {"psnr": 0, "mse": 0, 'ssim': 0, 'vif': 0, 'paq2piq': 0, 'NIQE': 0, 'PIQE': 0, 'FID_ImNet': 0, 'FID_random': 0,
+                       'brisque': 0}  # 'FID_ImNet': 0, 'FID_random': 0
     metrics_sets = {"psnr": [], "mse": [], 'ssim': [], 'vif': [], 'paq2piq': [], 'NIQE': [], 'PIQE': [], 'FID_ImNet': [], 'FID_random': [], 'brisque': []}
 
     total_patients = len(data)
@@ -87,11 +135,11 @@ def compute_wilcoxon_test(set_1, set_2, criterion):
 
 if __name__ == "__main__":
     from itertools import product
-<<<<<<< HEAD
+
     experiments_pix2pix = [
-                           "metrics_texture_avg_diff0001",
-                           "metrics_baseline_s_",
-=======
+        "metrics_texture_avg_diff0001",
+        "metrics_baseline_s_"]
+
     experiments_pix2pix = ["metrics_pix2pix_texture_att_diff_unpaired",
                            "metrics_pix2pix_texture_max_diff_unpaired",
                            "metrics_pix2pix_texture_Frob_diff_unpaired",
@@ -101,15 +149,14 @@ if __name__ == "__main__":
                            "metric_pix2pix_ssim",
                            "metric_pix2pix_autoencoder",
                            "metric_pix2pix_edge",
->>>>>>> origin/main
                            # "metrics_pix2pix_texture_att_diff_piqe",
                            # "metrics_pix2pix_perceptual_piqe",
                            # "metrics_pix2pix_baseline_diff_piqe",
                            # "metrics_pix2pix_texture_avg_diff_piqe",
                            # "metrics_pix2pix_texture_Frob_diff_piqe",
                            # "metrics_pix2pix_texture_max_diff_piqe",
-                   ]
-    #comparisons = list(product(experiments_pix2pix, experiments_pix2pix))
+                           ]
+    # comparisons = list(product(experiments_pix2pix, experiments_pix2pix))
     experiments_unit = [
         "metrics_baseline_piqe_niqe",
         "metrics_perceptual_piqe_niqe",
@@ -121,24 +168,116 @@ if __name__ == "__main__":
         "metrics_ssim",
         "metrics_autoencoder",
     ]
-<<<<<<< HEAD
-    comparisons = list(product(experiments_pix2pix, experiments_pix2pix))
-
     # /Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_att_diff_unpaired_1/metrics_{test_name}_epoch50
     # Per patient average metrics
-    for test_name in ['test_2']:  # , 'test_2', 'test_3', 'elcap_complete'
+    """for test_name in ['test_2']:  # , 'test_2', 'test_3', 'elcap_complete'
         data = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_baseline_s_4/metrics_{test_name}_epoch50")
         data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_baseline_s_5/metrics_{test_name}_epoch50")
-        data2 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_baseline_s_6/metrics_{test_name}_epoch50")
-=======
+        data2 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_baseline_s_6/metrics_{test_name}_epoch50")"""
+
     comparisons = list(product(experiments_unit, experiments_unit))
-    """  # /Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_att_diff_unpaired_1/metrics_{test_name}_epoch50
+    # /Volumes/Untitled/results_per_patient/pix2pix/metrics_pix2pix_texture_att_diff_unpaired_1/metrics_{test_name}_epoch50
     # Per patient average metrics
-    for test_name in ['test_2', 'test_3', 'elcap_complete']:  # , 'test_2', 'test_3', 'elcap_complete'
-        data = load_from_json(f"/Volumes/sandisk/cycleGAN_emphysema/metrics_baseline_9pat_LUNAhwind_1/metrics_{test_name}_epoch50")
-        data1 = load_from_json(f"/Volumes/sandisk/cycleGAN_emphysema/metrics_baseline_9pat_LUNAhwind_1/metrics_{test_name}_epoch50")
-        data2 = load_from_json(f"/Volumes/sandisk/cycleGAN_emphysema/metrics_baseline_9pat_LUNAhwind_1/metrics_{test_name}_epoch50")
->>>>>>> origin/main
+    for test_name in ['elcap_complete']:  # , 'test_2', 'test_3', 'elcap_complete'
+        data = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_texture_Frob_diff_piqe_niqe_1/metrics_{test_name}_epoch50")
+        data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_texture_Frob_diff_piqe_niqe_2/metrics_{test_name}_epoch50")
+        data2 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_texture_Frob_diff_piqe_niqe_3/metrics_{test_name}_epoch50")
+
+        #########################
+        data3 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_texture_attention_diff_piqe_niqe_1/metrics_{test_name}_epoch50")
+        data4 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_texture_attention_diff_piqe_niqe_2/metrics_{test_name}_epoch50")
+        data5 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/metrics_texture_attention_diff_piqe_niqe_3/metrics_{test_name}_epoch50")
+
+        set_1 = average_per_slice_patient([data, data1, data2])
+        set_2 = average_per_slice_patient([data3, data4, data5])
+
+        psnr_1 = []
+        psnr_2 = []
+        mse_1 = []
+        mse_2 = []
+        ssim_1 = []
+        ssim_2 = []
+        niqe_1 = []
+        niqe_2 = []
+        piqe_1 = []
+        piqe_2 = []
+
+        mse = []
+        for key in set_1.keys():
+            print(key)
+            print(f"psnr:{np.mean(set_1[key]['psnr'])},{np.std(set_1[key]['psnr'])}, {np.mean(set_2[key]['psnr'])}, {np.std(set_2[key]['psnr'])}")
+            print(f"mse:{np.mean(set_1[key]['mse'])}, {np.mean(set_2[key]['mse'])}")
+            print(f"ssim:{np.mean(set_1[key]['ssim'])}, {np.mean(set_2[key]['ssim'])}")
+            # print(f"niqe:{np.mean(set_1[key]['NIQE'])}, {np.mean(set_2[key]['NIQE'])}")
+            # print(f"piqe:{np.mean(set_2[key]['PIQE'])}, {np.std(set_2[key]['PIQE'])}, {np.mean(set_1[key]['PIQE'])}, {np.std(set_1[key]['PIQE'])}")
+
+            psnr_1.append(np.mean(set_1[key]['psnr']))
+            psnr_2.append(np.mean(set_2[key]['psnr']))
+            mse_1.append(np.mean(set_1[key]['mse']))
+            mse_2.append(np.mean(set_2[key]['mse']))
+            ssim_1.append(np.mean(set_1[key]['ssim']))
+            ssim_2.append(np.mean(set_2[key]['ssim']))
+            niqe_1.append(np.mean(set_1[key]['NIQE']))
+            niqe_2.append(np.mean(set_2[key]['NIQE']))
+            piqe_1.append(np.mean(set_1[key]['PIQE']))
+            piqe_2.append(np.mean(set_2[key]['PIQE']))
+            print("psnr")
+            #compute_wilcoxon_test(set_2[key]['psnr'], set_1[key]['psnr'], "greater")  # "greater", "less", "two-sided"
+            print("mse")
+            #compute_wilcoxon_test(set_2[key]['mse'], set_1[key]['mse'], "less")
+            print("ssim")
+            #compute_wilcoxon_test(set_2[key]['ssim'], set_1[key]['ssim'], "greater")
+            print("niqe")
+            compute_wilcoxon_test(set_2[key]['NIQE'], set_1[key]['NIQE'], "less")
+            print("piqe")
+            compute_wilcoxon_test(set_2[key]['PIQE'], set_1[key]['PIQE'], "less")
+            print("#######################")
+            print("opposite direction")
+            print("psnr")
+            # compute_wilcoxon_test(set_2[key]['psnr'], set_1[key]['psnr'], "less") # "greater", "less", "two-sided"
+            print("mse")
+            # compute_wilcoxon_test(set_2[key]['mse'], set_1[key]['mse'], "greater")
+            print("ssim")
+            # compute_wilcoxon_test(set_2[key]['ssim'], set_1[key]['ssim'], "less")
+            print("niqe")
+            compute_wilcoxon_test(set_2[key]['NIQE'], set_1[key]['NIQE'], "greater")
+            print("piqe")
+            compute_wilcoxon_test(set_2[key]['PIQE'], set_1[key]['PIQE'], "greater")
+            print("#######################")
+            print("two-sided")
+            print("psnr")
+            # compute_wilcoxon_test(set_2[key]['psnr'], set_1[key]['psnr'], "two-sided") # "greater", "less", "two-sided"
+            print("mse")
+            # compute_wilcoxon_test(set_2[key]['mse'], set_1[key]['mse'], "two-sided")
+            print("ssim")
+            # compute_wilcoxon_test(set_2[key]['ssim'], set_1[key]['ssim'], "two-sided")
+            print("niqe")
+            compute_wilcoxon_test(set_2[key]['NIQE'], set_1[key]['NIQE'], "two-sided")
+            print("piqe")
+            compute_wilcoxon_test(set_2[key]['PIQE'], set_1[key]['PIQE'], "two-sided")
+            print("%%%%%%%%%%%%%%%%%%%%%%%")
+        print(f"Avg psnr 1: {np.mean(psnr_1)}, Avg mse 1: {np.mean(mse_1)}, Avg ssim 1: {np.mean(ssim_1)}, Avg niqe 1: {np.mean(niqe_1)}, Avg piqe 1: {np.mean(piqe_1)}, {np.std(piqe_1)}")
+        print(f"Avg psnr 2: {np.mean(psnr_2)}, Avg mse 2: {np.mean(mse_2)}, Avg ssim 2: {np.mean(ssim_2)}, Avg niqe 2: {np.mean(niqe_2)}, Avg piqe 2: {np.mean(piqe_2)}, {np.std(piqe_2)}")
+        # overall metric list
+        # set1 = overall_metric_set(data)
+        # set2 = overall_metric_set(data1)
+        # set3 = overall_metric_set(data2)
+
+        # per slice average
+        # per_slice_avg_1 = overall_per_slice_average([set1, set2, set3])
+
+        # overall metric list
+        # set4 = overall_metric_set(data3)
+        # set5 = overall_metric_set(data4)
+        # set6 = overall_metric_set(data5)
+
+        # per slice average
+        # per_slice_avg_2 = overall_per_slice_average([set3, set4, set5])
+
+        # wilcoxon
+        # print(np.mean(per_slice_avg_2['NIQE']), np.mean(per_slice_avg_1['NIQE']))
+        # compute_wilcoxon_test(per_slice_avg_2['NIQE'], per_slice_avg_1['NIQE'], "less")
+        #########################
 
         # compute the average for each patient in each experiment
         patient_averages_data = calculate_patient_averages(data)
@@ -154,30 +293,27 @@ if __name__ == "__main__":
 
         # compute the overall average by averaging over the patients
         averaged_metrics, _ = calculate_average_metrics(average_of_averages)
-<<<<<<< HEAD
+
         print(f"Overall average between 3 experiments {test_name}: {averaged_metrics}")
-=======
-        print(f"Overall average between 3 experiments {test_name}: {averaged_metrics}")"""
->>>>>>> origin/main
 
     # Wilcoxon test
-    for i in comparisons:
+    """for i in comparisons:
         for test_name in ['test_2', 'test_3', 'elcap_complete']:  # , 'test_2', 'test_3', 'elcap_complete'
-<<<<<<< HEAD
+
             data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/{i[0]}_1/metrics_{test_name}_epoch50")
             data2 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/{i[0]}_2/metrics_{test_name}_epoch50")
             data3 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/{i[0]}_3/metrics_{test_name}_epoch50")
             data4 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/{i[1]}_1/metrics_{test_name}_epoch50")
             data5 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/{i[1]}_2/metrics_{test_name}_epoch50")
             data6 = load_from_json(f"/Volumes/Untitled/results_per_patient/pix2pix/{i[1]}_3/metrics_{test_name}_epoch50")
-=======
+
             data1 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/{i[0]}_1/metrics_{test_name}_epoch50")
             data2 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/{i[0]}_2/metrics_{test_name}_epoch50")
             data3 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/{i[0]}_3/metrics_{test_name}_epoch50")
             data4 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/{i[1]}_1/metrics_{test_name}_epoch50")
             data5 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/{i[1]}_2/metrics_{test_name}_epoch50")
             data6 = load_from_json(f"/Volumes/Untitled/results_per_patient/UNIT/{i[1]}_3/metrics_{test_name}_epoch50")
->>>>>>> origin/main
+
 
             # compute the average for each patient in each experiment
             patient_averages_data1 = calculate_patient_averages(data1)
@@ -204,11 +340,11 @@ if __name__ == "__main__":
 
                 # MSE
                 print("Wilcoxon MSE:")
-<<<<<<< HEAD
+
                 compute_wilcoxon_test(metric_sets_1['mse'], metric_sets_2['mse'], "less")
-=======
+
                 # compute_wilcoxon_test(metric_sets_1['mse'], metric_sets_2['mse'], "less")
->>>>>>> origin/main
+
                 # SSIM
                 print("Wilcoxon SSIM:")
                 # compute_wilcoxon_test(metric_sets_1['ssim'], metric_sets_2['ssim'], "greater")
@@ -217,20 +353,20 @@ if __name__ == "__main__":
                 # compute_wilcoxon_test(metric_sets_1['vif'], metric_sets_2['vif'], "greater")
                 # NIQE
                 print("Wilcoxon NIQE:")
-<<<<<<< HEAD
+
                 # compute_wilcoxon_test(metric_sets_1['NIQE'], metric_sets_2['NIQE'], "less")
                 # PIQE
                 print("Wilcoxon PIQE:")
                 # compute_wilcoxon_test(metric_sets_1['PIQE'], metric_sets_2['PIQE'], "less")
-=======
+
                 compute_wilcoxon_test(metric_sets_1['NIQE'], metric_sets_2['NIQE'], "less")
                 # PIQE
                 print("Wilcoxon PIQE:")
                 compute_wilcoxon_test(metric_sets_1['PIQE'], metric_sets_2['PIQE'], "less")
->>>>>>> origin/main
+
             except:
                   print(f"TEST {test_name}, ({i[0]}-{i[1]})")
-                  pass
+                  pass"""
 
     # ATTENTION MAPS
     # attention1 = np.load("/Volumes/sandisk/results_per_patient/cycleGAN/loss_texture_att_diff0001_4/attention_A.npy")
